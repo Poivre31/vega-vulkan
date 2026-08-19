@@ -1,5 +1,7 @@
 build/*
 install/*
 .idea/*
+visual_studio_2022/*
+visual_studio_2026/*
 
 compile_commands.json
