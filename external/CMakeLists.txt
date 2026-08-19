@@ -1,0 +1,45 @@
+add_library(SDL INTERFACE)
+
+if(SDL3_ALREADY_CONFIGURED)
+    return()
+endif()
+
+set(SDL_SHARED OFF  CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_TEST   OFF CACHE BOOL "" FORCE)
+
+set(SDL_JOYSTICK  OFF CACHE BOOL "" FORCE)
+set(SDL_HAPTIC  OFF CACHE BOOL "" FORCE)
+set(SDL_POWER  OFF CACHE BOOL "" FORCE)
+set(SDL_SENSOR  OFF CACHE BOOL "" FORCE)
+set(SDL_GPU  OFF CACHE BOOL "" FORCE)
+set(SDL_RENDER   OFF CACHE BOOL "" FORCE)
+set(SDL_CAMERA   OFF CACHE BOOL "" FORCE)
+set(SDL_AUDIO   OFF CACHE BOOL "" FORCE)
+
+# set(SDL_OPENGL    OFF CACHE BOOL "" FORCE)
+# set(SDL_OPENGLES  OFF CACHE BOOL "" FORCE)
+set(SDL_METAL     OFF CACHE BOOL "" FORCE)
+set(SDL_DIRECT3D  OFF CACHE BOOL "" FORCE)
+set(SDL_WAYLAND OFF CACHE BOOL "" FORCE)
+
+set(SDL_OPENGL   ON CACHE BOOL "" FORCE)
+set(SDL_OPENGLES ON CACHE BOOL "" FORCE)
+set(SDL_VULKAN ON CACHE BOOL "" FORCE)
+
+# if(SDL3_ALREADY_CONFIGURED)
+#     message(STATUS "SDL3 already configured, skipping")
+# else()
+#     set(SDL3_ALREADY_CONFIGURED TRUE CACHE BOOL "Skip SDL3 reconfigure" FORCE)
+# endif()
+add_subdirectory(SDL3)
+
+target_link_libraries(SDL INTERFACE SDL3::SDL3)
+
+# if(WIN32)
+#     add_custom_command(TARGET external POST_BUILD
+#         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#             $<TARGET_FILE:SDL3::SDL3>
+#             $<TARGET_FILE_DIR:external>
+#     )
+# endif()

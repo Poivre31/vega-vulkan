@@ -1,0 +1,44 @@
+---
+BasedOnStyle: Chromium
+AlignAfterOpenBracket: BlockIndent
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossComments: true
+  AlignCompound: true
+  AlignFunctionDeclarations: true
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossComments: true
+  AlignCompound: true
+  AlignFunctionDeclarations: true
+  PadOperators: true
+AlignConsecutiveDeclarations:
+  AcrossComments: true
+  AlignCompound: true
+  PadOperators: true
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossComments: true
+  AlignCompound: true
+  AlignFunctionDeclarations: true
+  PadOperators: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossComments: true
+  AlignCaseArrows: true
+  AlignCaseColons: true
+AlignConsecutiveTableGenBreakingDAGArgColons:
+  AcrossComments: true
+  AlignCompound: true
+  AlignFunctionDeclarations: true
+  PadOperators: true
+BinPackArguments: false
+BreakBeforeBinaryOperators: NonAssignment
+ColumnLimit: 100
+InsertBraces: true
+PenaltyBreakAssignment: 100
+PenaltyBreakComment: 10
+SortIncludes:
+  Enabled: false
+TabWidth: 2
+WrapNamespaceBodyWithEmptyLines: Always

@@ -4,7 +4,7 @@
         {
             "name": "clang-debug",
             "description": "Using clang compiler and debug build",
-            "binaryDir": "${sourceDir}/build/clang/debug",
+            "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
                 "CMAKE_C_COMPILER": "/usr/bin/clang",
@@ -15,7 +15,7 @@
         {
             "name": "clang-release",
             "description": "Using clang compiler and release build",
-            "binaryDir": "${sourceDir}/build/clang/release",
+            "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
                 "CMAKE_C_COMPILER": "/usr/bin/clang",
@@ -25,7 +25,13 @@
         }
     ],
     "buildPresets": [
-        { "name": "clang-debug",  "configurePreset": "clang-debug"  },
-        { "name": "clang-release","configurePreset": "clang-release" }
+        {
+            "name": "clang-debug",
+            "configurePreset": "clang-debug"
+        },
+        {
+            "name": "clang-release",
+            "configurePreset": "clang-release"
+        }
     ]
 }

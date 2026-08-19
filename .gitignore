@@ -1,1 +1,5 @@
 build/*
+install/*
+.idea/*
+
+compile_commands.json
