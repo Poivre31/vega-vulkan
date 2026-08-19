@@ -1,0 +1,39 @@
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  modernize-*,
+  readability-*,
+  cppcoreguidelines-*,
+  clang-analyzer-*,
+  portability-*,
+
+  -bugprone-easily-swappable-parameters,
+
+  -modernize-use-trailing-return-type,
+
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -readability-else-after-return,
+  -readability-implicit-bool-conversion,
+  -readability-isolate-declaration,
+  -readability-math-missing-parentheses,
+
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+
+  -altera-*,
+  -android-*,
+  -abseil-*,
+  -boost-*,
+  -darwin-*,
+  -fuchsia-*,
+  -linuxkernel-*,
+  -llvm-*,
+  -llvmlibc-*,
+  -mpi-*,
+  -objc-*,
+  -zircon-*,
+
+HeaderFilterRegex: '.*/(include|src)'

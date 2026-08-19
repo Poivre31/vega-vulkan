@@ -1,3 +1,12 @@
 [submodule "external/SDL3"]
 	path = external/SDL3
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "vendor/VMA"]
+	path = vendor/VMA
+	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp
+[submodule "vendor/GLM"]
+	path = vendor/GLM
+	url = https://github.com/g-truc/glm
+[submodule "vendor/stb-image"]
+	path = vendor/stb-image
+	url = https://github.com/nothings/stb
