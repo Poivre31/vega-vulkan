@@ -35,9 +35,9 @@ add_custom_target(CopyShaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders
     COMMENT "Copying shaders: ${CMAKE_SOURCE_DIR}/shaders to ${CMAKE_BINARY_DIR}/shaders"
 
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/ressources
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/ressources ${CMAKE_BINARY_DIR}/ressources
-    COMMENT "Copying ressources: ${CMAKE_SOURCE_DIR}/ressources to ${CMAKE_BINARY_DIR}/ressources"
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/resources
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/resources ${CMAKE_BINARY_DIR}/resources
+    COMMENT "Copying resources: ${CMAKE_SOURCE_DIR}/resources to ${CMAKE_BINARY_DIR}/resources"
 )
 
 add_dependencies(VegaVulkan CopyShaders)

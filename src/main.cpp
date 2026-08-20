@@ -1,6 +1,6 @@
-#include <iostream>
 #include "graphics.hpp"
 #include "sdl.hpp"
+#include <console/console.hpp>
 
 const vk::ApplicationInfo appInfo{
     .pApplicationName   = "Vega Vulkan",
@@ -9,7 +9,6 @@ const vk::ApplicationInfo appInfo{
 };
 
 int main() {
-  std::cout << "Hello world\n";
   sdl_app app;
   app.init();
   app.run();

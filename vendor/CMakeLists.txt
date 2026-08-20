@@ -1,5 +1,11 @@
 add_library(vendor INTERFACE)
 
+# VEGA
+add_subdirectory(spdlog)
+add_subdirectory(vega/console)
+add_subdirectory(vega/timer)
+# END VEGA
+
 # VMA
 add_subdirectory(VMA/include)
 
@@ -50,6 +56,8 @@ target_link_libraries(vendor INTERFACE
     SDL3::SDL3
     VulkanMemoryAllocator-Hpp::VulkanMemoryAllocator-Hpp
     glm::glm
+    Console
+    Timer
 )
 
 
