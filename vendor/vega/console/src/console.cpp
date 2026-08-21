@@ -10,7 +10,6 @@ bool console::exists(const std::string& name) noexcept {
 
 vega_console
 console::create(const std::string& name, spdlog::level::level_enum level, bool silence) noexcept {
-  assert(_engine_console != nullptr);
   if (exists(name)) {
     _engine_console->error(
         "Trying to create console [{:s}] that already exists.\nCheck console::exists(name) "

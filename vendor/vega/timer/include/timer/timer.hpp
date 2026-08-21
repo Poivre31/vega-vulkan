@@ -123,6 +123,15 @@ class timer {
       size_t precision        = 0
   ) noexcept;
 
+  /** Logs "message + time/unit" to given console*/
+  static void log_time_to_console(
+      const std::string& name,
+      const vega_console& console,
+      std::string_view message,
+      time_unit unit   = default_time_unit,
+      size_t precision = 0
+  ) noexcept;
+
   /** Prints time elapsed since timer creation, excluding time spent paused, for each timer still
    * existing TO OPTIMIZE*/
   static void

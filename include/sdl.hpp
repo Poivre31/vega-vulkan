@@ -3,11 +3,106 @@
 #include "stb_image.hpp"
 #include <console/console.hpp>
 #include <timer/timer.hpp>
+#include "layer.hpp"
 
 const std::string texturePath = "beer.png";
 
 struct sdl_exception : public std::runtime_error {
   using std::runtime_error::runtime_error;
+};
+
+class sdl_layer : public Ilayer {
+  void init() noexcept final {
+    auto timer = scoped_timer("sdl-init");
+    _image.load(texturePath);
+
+    bool success = SDL_Init(SDL_INIT_VIDEO);
+    if (!success) {
+      console::get(consoles::graphics)
+          ->error("SDL error during initialisation : {:s}\nAborting program", SDL_GetError());
+      cleanup();
+      std::abort();
+    }
+
+    _window = SDL_CreateWindow("My window", _width, _height, SDL_WINDOW_RESIZABLE);
+    if (!_window) {
+      console::get(consoles::graphics)
+          ->error("SDL error during window creation : {:s}\nAborting program", SDL_GetError());
+      cleanup();
+      std::abort();
+    }
+
+    _renderer = SDL_CreateRenderer(_window, nullptr);
+    if (!_renderer) {
+      console::get(consoles::graphics)
+          ->error("SDL error during renderer creation : {:s}\nAborting program", SDL_GetError());
+      cleanup();
+      std::abort();
+    }
+
+    _imageSurface = SDL_CreateSurfaceFrom(
+        _image.width(), _image.height(), SDL_PIXELFORMAT_RGBA32, _image.data(), _image.pitch()
+    );
+    if (!_imageSurface) {
+      console::get(consoles::graphics)
+          ->error("SDL error during surface creation : {:s}\nAborting program", SDL_GetError());
+      cleanup();
+      std::abort();
+    }
+
+    _imageTexture = SDL_CreateTextureFromSurface(_renderer, _imageSurface);
+    if (!_imageTexture) {
+      console::get(consoles::graphics)
+          ->error("SDL error during texture creation: {:s}\nAborting program", SDL_GetError());
+      cleanup();
+      std::abort();
+    }
+  }
+
+  void update(double dt) noexcept final {
+    try {
+      if (!SDL_SetRenderDrawColorFloat(_renderer, 0.3, 0.4, 0.9, 1.)) {
+        throw sdl_exception(SDL_GetError());
+      }
+      if (!SDL_RenderClear(_renderer)) {
+        throw sdl_exception(SDL_GetError());
+      }
+      if (!SDL_RenderTexture(_renderer, _imageTexture, nullptr, nullptr)) {
+        throw sdl_exception(SDL_GetError());
+      }
+      if (!SDL_RenderPresent(_renderer)) {
+        throw sdl_exception(SDL_GetError());
+      }
+    } catch (const sdl_exception& e) {
+      console::get(consoles::graphics)
+          ->error("SDL error during rendering : {}\nStopping application loop", e.what());
+      _running = false;
+    }
+  }
+
+  void cleanup() noexcept final {
+    SDL_DestroyTexture(_imageTexture);
+    _imageTexture = nullptr;
+    SDL_DestroySurface(_imageSurface);
+    _imageSurface = nullptr;
+    SDL_DestroyRenderer(_renderer);
+    _renderer = nullptr;
+    SDL_DestroyWindow(_window);
+    _window = nullptr;
+    SDL_Quit();
+  }
+
+ private:
+  SDL_Window* _window        = nullptr;
+  SDL_Renderer* _renderer    = nullptr;
+  SDL_Surface* _imageSurface = nullptr;
+  SDL_Texture* _imageTexture = nullptr;
+
+  bool _running{};
+  int _width  = 1280;
+  int _height = 720;
+
+  stb_image _image;
 };
 
 class sdl_app {

@@ -136,8 +136,27 @@ void timer::destroy(const std::string& name) noexcept {
 void timer::print_elapsed_time(const std::string& name, time_unit unit, size_t precision) noexcept {
   try {
     _console->info(
-        fmt::runtime("Time since timer [{:s}] start: {:." + std::to_string(precision) + "f} {:s}"),
+        fmt::runtime("Time since timer [{:s}] start: {:." + std::to_string(precision) + "f}{:s}"),
         name,
+        get_elapsed_time(name, unit),
+        time_unit_text(unit)
+    );
+  } catch (...) {
+    handle_exception("Timer/print");
+  }
+}
+
+void timer::log_time_to_console(
+    const std::string& name,
+    const vega_console& console,
+    std::string_view message,
+    time_unit unit,
+    size_t precision
+) noexcept {
+  try {
+    console->info(
+        fmt::runtime("{} {:." + std::to_string(precision) + "f}{:s}"),
+        message,
         get_elapsed_time(name, unit),
         time_unit_text(unit)
     );

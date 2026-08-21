@@ -40,5 +40,6 @@ PenaltyBreakAssignment: 100
 PenaltyBreakComment: 10
 SortIncludes:
   Enabled: false
+SortUsingDeclarations: Never
 TabWidth: 2
 WrapNamespaceBodyWithEmptyLines: Always

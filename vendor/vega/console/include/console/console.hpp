@@ -11,21 +11,26 @@
 
 #include "console/format.hpp"  // IWYU pragma: export
 
-constexpr bool silence_color_management = true;
-
 namespace level {
 
-using spdlog::level::critical;
-using spdlog::level::debug;
-using spdlog::level::err;
-using spdlog::level::info;
 using spdlog::level::trace;
+using spdlog::level::debug;
+using spdlog::level::info;
 using spdlog::level::warn;
+using spdlog::level::err;
+using spdlog::level::critical;
 
 }  // namespace level
 
 /** The engine's consoles that are created at startup and always available. */
 enum class consoles : uint8_t { engine, math, timer, test, graphics, assets };
+
+constexpr bool silence_console_management = true;
+#ifdef NDEBUG
+constexpr spdlog::level::level_enum library_log_level = level::info;
+#else
+constexpr spdlog::level::level_enum library_log_level = level::trace;
+#endif
 
 using vega_console = std::shared_ptr<spdlog::logger>;
 
@@ -52,7 +57,7 @@ class console {
   static vega_console create(
       const std::string& name,
       spdlog::level::level_enum log_level = level::trace,
-      bool silence                        = silence_color_management
+      bool silence                        = silence_console_management
   ) noexcept;
 
   /**
@@ -60,25 +65,58 @@ class console {
   yet, returns sink console (discards all commands).
   */
   [[nodiscard]] static vega_console
-  get(const std::string& name, bool silence = silence_color_management) noexcept;
+  get(const std::string& name, bool silence = silence_console_management) noexcept;
 
   /**
    * @brief Returns one of the default consoles such as [VegaEngine] or
    * [VegaMath].
    */
   [[nodiscard]] static vega_console
-  get(consoles console, bool silence = silence_color_management) noexcept;
+  get(consoles console, bool silence = silence_console_management) noexcept;
+
+  /** @brief Silences all logs under @param level for all library consoles
+   * For example, after calling with level 'info', every logs to [VegaEngine] or [VegaMath] with
+   * level 'info' or above ('warn','error'...) will be logged as usual but if level is lower than
+   * 'info' ('debug','trace'), nothing will be logged. Defaults to 'trace' for debug builds
+   * (everything is logged) and 'info' for release builds.
+   */
+  static void set_library_consoles_log_level(spdlog::level::level_enum level) noexcept {
+    if (level == level::warn) {
+      _engine_console->warn(
+          "Silencing warnings for all library consoles which is not recomended. You should only "
+          "silence trace/debug/info for library consoles"
+      );
+    }
+    if (level > level::warn) {
+      _engine_console->error(
+          "Silencing errors/criticals for all library consoles which is not permitted. Setting "
+          "level to 'warn', but you should only silence trace/debug/info for library consoles."
+      );
+      level = level::warn;
+    }
+    _engine_console->set_level(level);
+    _math_console->set_level(level);
+    _timer_console->set_level(level);
+    _test_console->set_level(level);
+    _graphics_console->set_level(level);
+    _assets_console->set_level(level);
+  }
 
  private:
   static vega_console handle_exception(std::string_view context) noexcept;
 
-  static inline auto _engine_console = create("VegaEngine", level::trace, silence_color_management);
-  static inline auto _math_console   = create("VegaMath", level::trace, silence_color_management);
-  static inline auto _timer_console  = create("VegaTimer", level::trace, silence_color_management);
-  static inline auto _test_console   = create("VegaTest", level::trace, silence_color_management);
+  static inline auto _engine_console =
+      create("VegaEngine", library_log_level, silence_console_management);
+  static inline auto _math_console =
+      create("VegaMath", library_log_level, silence_console_management);
+  static inline auto _timer_console =
+      create("VegaTimer", library_log_level, silence_console_management);
+  static inline auto _test_console =
+      create("VegaTest", library_log_level, silence_console_management);
   static inline auto _graphics_console =
-      create("VegaGraphics", level::trace, silence_color_management);
-  static inline auto _assets_console = create("VegaAssets", level::trace, silence_color_management);
+      create("VegaGraphics", library_log_level, silence_console_management);
+  static inline auto _assets_console =
+      create("VegaAssets", library_log_level, silence_console_management);
 
   static inline auto _sink_console =
       std::make_shared<spdlog::logger>("Sink", std::make_shared<spdlog::sinks::null_sink_mt>());

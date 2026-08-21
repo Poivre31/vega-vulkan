@@ -15,6 +15,8 @@ target_sources(VegaVulkan PRIVATE
     "include/glm.hpp"
     "include/stb_image.hpp"
     "include/sdl.hpp"
+    "include/layer.hpp"
+    "include/application.hpp"
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 
@@ -31,10 +33,6 @@ target_link_libraries(VegaVulkan PRIVATE
 )
 
 add_custom_target(CopyShaders
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/shaders
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders
-    COMMENT "Copying shaders: ${CMAKE_SOURCE_DIR}/shaders to ${CMAKE_BINARY_DIR}/shaders"
-
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/resources
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/resources ${CMAKE_BINARY_DIR}/resources
     COMMENT "Copying resources: ${CMAKE_SOURCE_DIR}/resources to ${CMAKE_BINARY_DIR}/resources"
@@ -42,5 +40,5 @@ add_custom_target(CopyShaders
 
 add_dependencies(VegaVulkan CopyShaders)
 
-install(TARGETS VegaVulkan DESTINATION bin)
-
+install(TARGETS VegaVulkan DESTINATION .)
+install(DIRECTORY resources DESTINATION .)
