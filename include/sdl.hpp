@@ -2,6 +2,7 @@
 #include <SDL3/SDL.h>  // IWYU pragma: export
 #include "stb_image.hpp"
 #include <console/console.hpp>
+#include <timer/timer.hpp>
 
 const std::string texturePath = "beer.png";
 
@@ -12,6 +13,7 @@ struct sdl_exception : public std::runtime_error {
 class sdl_app {
  public:
   void init() noexcept {
+    auto timer = scoped_timer("sdl-init");
     _image.load(texturePath);
 
     bool success = SDL_Init(SDL_INIT_VIDEO);

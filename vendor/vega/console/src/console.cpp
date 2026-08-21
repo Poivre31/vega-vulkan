@@ -10,6 +10,7 @@ bool console::exists(const std::string& name) noexcept {
 
 vega_console
 console::create(const std::string& name, spdlog::level::level_enum level, bool silence) noexcept {
+  assert(_engine_console != nullptr);
   if (exists(name)) {
     _engine_console->error(
         "Trying to create console [{:s}] that already exists.\nCheck console::exists(name) "
@@ -29,30 +30,30 @@ console::create(const std::string& name, spdlog::level::level_enum level, bool s
       con->trace("Created console [{:s}]", name);
     }
     return con;
-  } catch (const spdlog::spdlog_ex& e) {
-    _engine_console->error(
-        "Exception when creating [{:s}] : {:s}.\nReturning sink console (discards all commands)",
-        name,
-        e.what()
-    );
-    return _sink_console;
+  } catch (...) {
+    return handle_exception("Console/create");
   }
 }
 
 vega_console console::get(const std::string& name, bool silence) noexcept {
-  vega_console con = spdlog::get(name);
-  if (con) {
-    if (!silence) {
-      con->trace("Returning console [{:s}]", name);
+  try {
+    vega_console con = spdlog::get(name);
+    if (con) {
+      if (!silence) {
+        con->trace("Returning console [{:s}]", name);
+      }
+      return con;
+    } else {
+      _engine_console->error(
+          "Console [{:s}] doesn't exist yet, returning sink console (discards all "
+          "commands).\nCheck "
+          "if console::exists(name) if you're not sure it has been created",
+          name
+      );
+      return _sink_console;
     }
-    return con;
-  } else {
-    _engine_console->error(
-        "Console [{:s}] doesn't exist yet, returning sink console (discards all commands).\nCheck "
-        "if console::exists(name) if you're not sure it has been created",
-        name
-    );
-    return _sink_console;
+  } catch (...) {
+    return handle_exception("Console/get");
   }
 }
 
@@ -78,14 +79,28 @@ vega_console console::get(consoles default_console, bool silence) noexcept {
       console = _assets_console;
       break;
   }
-  vega_assert(
-      console != nullptr,
-      _engine_console,
-      "Getting a default console that hasn't been implemented or created (error responsability "
-      "from Vega)"
-  );
+  assert(console != nullptr && "Getting a default console that hasn't been implemented or created");
   if (!silence) {
     console->trace("Found default console [{:s}]", console->name());
   }
   return console;
+}
+
+vega_console console::handle_exception(std::string_view context) noexcept {
+  assert(_engine_console != nullptr);
+  try {
+    throw;
+  } catch (const std::exception& e) {
+    _engine_console->error(
+        "[{}] console exception : {:s}.\nReturning sink console (discards all commands)",
+        context,
+        e.what()
+    );
+    return _sink_console;
+  } catch (...) {
+    _engine_console->error(
+        "[{}] console unknown error.\nReturning sink console (discards all commands)", context
+    );
+    return _sink_console;
+  }
 }

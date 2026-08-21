@@ -13,4 +13,5 @@ int main() {
   app.init();
   app.run();
   app.quit();
+  timer::print_all_elapsed_times();
 }

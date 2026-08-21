@@ -70,6 +70,8 @@ class console {
   get(consoles console, bool silence = silence_color_management) noexcept;
 
  private:
+  static vega_console handle_exception(std::string_view context) noexcept;
+
   static inline auto _engine_console = create("VegaEngine", level::trace, silence_color_management);
   static inline auto _math_console   = create("VegaMath", level::trace, silence_color_management);
   static inline auto _timer_console  = create("VegaTimer", level::trace, silence_color_management);
@@ -82,16 +84,16 @@ class console {
       std::make_shared<spdlog::logger>("Sink", std::make_shared<spdlog::sinks::null_sink_mt>());
 };
 
-/** @brief  */
-template <typename... Args>
-static inline void vega_assert(
-    bool expression,
-    const vega_console& console,
-    spdlog::format_string_t<Args...> message,
-    Args&&... args
-) {
-  if (!expression) {
-    console->critical(message, std::forward<Args>(args)...);
-  }
-  assert(expression);
-}
+// /** @brief  */
+// template <typename... Args>
+// static inline void vega_assert(
+//     bool expression,
+//     const vega_console& console,
+//     spdlog::format_string_t<Args...> message,
+//     Args&&... args
+// ) {
+//   if (!expression) {
+//     console->critical(message, std::forward<Args>(args)...);
+//   }
+//   assert(expression);
+// }

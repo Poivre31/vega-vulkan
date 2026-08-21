@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <memory>
 #include <console/console.hpp>
+#include <timer/timer.hpp>
 
 enum class stb_channels : uint8_t { RGB = STBI_rgb, RGBA = STBI_rgb_alpha };
 
@@ -35,8 +36,16 @@ class stb_image {
    * @param target_channels The channels you want in the loaded image, either RGB or RGBA
    *
    */
-  void load(std::string image_path, stb_channels target_channels = stb_channels::RGBA) noexcept {
+  void load(
+      std::string image_path,
+      stb_channels target_channels = stb_channels::RGBA,
+      bool silence                 = false
+  ) noexcept {
+    auto timer = scoped_timer("image-loading");
     if (_image_loaded) {
+      if (!silence) {
+        console::get(consoles::assets)->trace("Loading image: unloading previous image");
+      }
       unload();
     }
 
@@ -55,6 +64,10 @@ class stb_image {
           return;
         }
       }
+      if (!silence) {
+        console::get(consoles::assets)
+            ->trace("Loading image: found image at '{:s}'", path.string());
+      }
       auto* image_data = stbi_load(
           path.string().data(),
           &_tex_width,
@@ -63,7 +76,7 @@ class stb_image {
           static_cast<int>(target_channels)
       );
       if (!image_data) {
-        console::get(consoles::assets, true)
+        console::get(consoles::assets)
             ->error(
                 "Image '{:s}' exists but loading failed,  loading fallback texture", path.string()
             );
@@ -72,6 +85,15 @@ class stb_image {
       _data         = stb_image_ptr(image_data, stbi_image_free);
       _channels     = static_cast<int>(target_channels);
       _image_loaded = true;
+      if (!silence) {
+        console::get(consoles::assets)
+            ->trace(
+                "Loading image: succesfully loaded image '{:s}' of size ({}, {})",
+                image_path,
+                _tex_width,
+                _tex_height
+            );
+      }
     } catch (const std::filesystem::filesystem_error& e) {
       console::get(consoles::assets)
           ->error("Filesystem error loading '{}': {}", image_path, e.what());
