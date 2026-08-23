@@ -17,13 +17,16 @@ target_sources(VegaVulkan PRIVATE
     "include/sdl.hpp"
     "include/layer.hpp"
     "include/application.hpp"
+    include/vulkan/vulkan_layer.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 
 add_subdirectory(vendor)
 
 find_package(Vulkan 1.3 REQUIRED)
-target_compile_definitions(VegaVulkan PRIVATE VULKAN_HPP_NO_STRUCT_CONSTRUCTORS)
+target_compile_definitions(VegaVulkan PRIVATE
+    VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+)
 
 target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics.hpp")
 

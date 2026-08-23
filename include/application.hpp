@@ -2,8 +2,21 @@
 #include "layer.hpp"
 #include "sdl.hpp"
 #include <console/console.hpp>
+#include <concepts>
+#include <queue>
 
-template <std::derived_from<Ilayer>... layers>
+template <class T>
+concept application_layer = std::derived_from<T, Ilayer> && std::is_final_v<T>;
+
+namespace application_config {
+
+constexpr double average_dt_window_length = 1.;
+
+constexpr double fixed_time_step = 1. / 60;
+
+};  // namespace application_config
+
+template <application_layer... layers>
 class application {
  public:
   application(std::string_view name) : _name(name) {
@@ -12,45 +25,52 @@ class application {
     _console = console::create(_name);
   }
 
-  template <std::derived_from<Ilayer> T>
-  void push_layer() {
-    _layers.push_back(std::make_unique<T>());
-  }
-
   void run() noexcept {
     timer::create(_name);
-    _console->info("Running !");
     for (auto& layer : _layers) {
       layer->init();
     }
-    timer::log_time_to_console(_name, _console, "Initialised layers in");
+    _context.running = true;
+    timer::log_time_to_console(
+        _name, _console, "Initialised application in", time_unit::millisecond
+    );
+    timer::create("runtime");
 
-    bool _running = true;
-    SDL_Event event{0};
     timer::create("frame-time");
-    while (_running) {
-      while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-          case (SDL_EVENT_QUIT):
-            _running = false;
-            break;
-
-          case (SDL_EVENT_KEY_DOWN):
-            if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-              _running = false;
-            }
-            break;
-          default:
-            break;
+    _frame_times.push(_context.time);
+    double delta_time = 0.;
+    while (_context.running) {
+      // TIMING
+      if (_context.frame > 0) {
+        _context.time = timer::get_elapsed_time("runtime");
+        _frame_times.push(_context.time);
+        while (_frame_times.back() - _frame_times.front()
+               > application_config::average_dt_window_length) {
+          _context.last_dt_window_time = _frame_times.front();
+          _frame_times.pop();
         }
+        assert(_frame_times.size() > 0);
+        _context.avg_dt = (_frame_times.back() - _context.last_dt_window_time)
+                          / static_cast<double>(_frame_times.size());
+        delta_time      = timer::get_elapsed_time("frame-time", time_unit::second);
       }
-      SDL_zero(event);
 
-      double dt = timer::get_elapsed_time("frame-time", time_unit::second);
+      // FRAME UPDATE
       timer::reset("frame-time");
       for (auto& layer : _layers) {
-        layer->update(dt);
+        layer->update(delta_time);
       }
+
+      // FIXED UPDATE
+      double fixed_dt = _context.time - _context.last_fixed_update_time;
+      if (fixed_dt >= application_config::fixed_time_step) {
+        for (auto& layer : _layers) {
+          layer->fixed_update(fixed_dt);
+        }
+        _context.last_fixed_update_time = _context.time;
+      }
+
+      _context.frame++;
     }
 
     for (auto& layer : _layers) {
@@ -59,7 +79,15 @@ class application {
   }
 
  private:
+  template <application_layer T>
+  void push_layer() {
+    _layers.push_back(std::make_unique<T>(&_context));
+  }
+
   std::vector<std::unique_ptr<Ilayer>> _layers;
   std::string _name;
   vega_console _console;
+  application_context _context;
+
+  std::queue<double> _frame_times;
 };

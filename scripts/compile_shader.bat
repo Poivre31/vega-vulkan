@@ -1,1 +1,1 @@
-slangc %2/%1 -target spirv -o %2/%1.spv
+slangc %2/%1.slang -target spirv -o %2/%1.spv

@@ -25,7 +25,19 @@
                 "CMAKE_BUILD_TYPE": "Release"
             }
         },
-                {
+        {
+            "name": "clang-release-minsize",
+            "description": "Using clang compiler and release build",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_BUILD_TYPE": "MinSizeRel"
+            }
+        },
+        {
             "name": "gcc-debug",
             "description": "Using GCC compiler and debug build",
             "generator": "Ninja",
@@ -48,6 +60,18 @@
                 "CMAKE_CXX_COMPILER": "g++",
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "gcc-release-minsize",
+            "description": "Using GCC compiler and release build",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_BUILD_TYPE": "MinSizeRel"
+            }
         }
     ],
     "buildPresets": [
@@ -59,13 +83,21 @@
             "name": "clang-release",
             "configurePreset": "clang-release"
         },
-                {
+        {
+            "name": "clang-release-minsize",
+            "configurePreset": "clang-release-minsize"
+        },
+        {
             "name": "gcc-debug",
             "configurePreset": "gcc-debug"
         },
         {
             "name": "gcc-release",
             "configurePreset": "gcc-release"
+        },
+        {
+            "name": "gcc-release-minsize",
+            "configurePreset": "gcc-release-minsize"
         }
     ]
 }

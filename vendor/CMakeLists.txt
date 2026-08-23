@@ -7,8 +7,8 @@ add_subdirectory(vega/timer)
 # END VEGA
 
 # VMA
-add_subdirectory(VMA/include)
-
+add_subdirectory(vma-hpp/include)
+target_link_libraries(vendor INTERFACE VulkanMemoryAllocator-Hpp::VulkanMemoryAllocator-Hpp)
 target_compile_definitions(vendor INTERFACE VMA_IMPLEMENTATION )
 # END VMA
 
@@ -37,16 +37,15 @@ set(SDL_SENSOR  OFF CACHE BOOL "" FORCE)
 set(SDL_CAMERA   OFF CACHE BOOL "" FORCE)
 set(SDL_AUDIO   OFF CACHE BOOL "" FORCE)
 
-# set(SDL_OPENGL    OFF CACHE BOOL "" FORCE)
-# set(SDL_OPENGLES  OFF CACHE BOOL "" FORCE)
+set(SDL_GPU  OFF CACHE BOOL "" FORCE)
+set(SDL_RENDER   OFF CACHE BOOL "" FORCE)
+
+set(SDL_OPENGL   OFF CACHE BOOL "" FORCE)
+set(SDL_OPENGLES OFF CACHE BOOL "" FORCE)
 set(SDL_METAL     OFF CACHE BOOL "" FORCE)
 set(SDL_DIRECT3D  OFF CACHE BOOL "" FORCE)
 set(SDL_WAYLAND OFF CACHE BOOL "" FORCE)
 
-set(SDL_GPU  ON CACHE BOOL "" FORCE)
-set(SDL_RENDER   ON CACHE BOOL "" FORCE)
-set(SDL_OPENGL   ON CACHE BOOL "" FORCE)
-set(SDL_OPENGLES ON CACHE BOOL "" FORCE)
 set(SDL_VULKAN ON CACHE BOOL "" FORCE)
 
 add_subdirectory(SDL3)

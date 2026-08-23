@@ -1,29 +1,23 @@
-#include "graphics.hpp"
 #include <console/console.hpp>
 #include "application.hpp"
+#include "vulkan/vulkan_layer.hpp"
 
-const vk::ApplicationInfo appInfo{
-    .pApplicationName   = "Vega Vulkan",
-    .applicationVersion = vk::makeVersion(0, 1, 0),
-    .apiVersion         = vk::ApiVersion13
-};
-
-class log_layer : public Ilayer {
+class fps_layer final : public Ilayer {
  public:
+  using Ilayer::Ilayer;
   void init() noexcept final {}
-  void update(double dt) noexcept final {
-    _console->info("Frame {}, delta time is {:.2g}ms", frame, dt * 1e3);
-    frame++;
+  void update(double dt) noexcept final {}
+  void fixed_update(double dt) noexcept final {
+    _console->info("Rendering at {:.2f}, avg {:.2f}", 1. / dt, 1. / get_app_context()->avg_dt);
   }
   void cleanup() noexcept final {}
 
  private:
-  vega_console _console = console::create("DeltaTimePrinter");
-  uint64_t frame        = 0;
+  vega_console _console = console::create("FPS");
 };
 
 int main() {
   console::set_library_consoles_log_level(level::debug);
-  application<log_layer> app("SDL app");
+  application<vulkan_layer> app("App");
   app.run();
 }

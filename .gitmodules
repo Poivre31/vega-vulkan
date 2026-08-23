@@ -1,6 +1,3 @@
-[submodule "vendor/VMA"]
-	path = vendor/VMA
-	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp
 [submodule "vendor/GLM"]
 	path = vendor/GLM
 	url = https://github.com/g-truc/glm
@@ -13,3 +10,6 @@
 [submodule "vendor/SDL3"]
 	path = vendor/SDL3
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "vendor/vma-hpp"]
+	path = vendor/vma-hpp
+	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp

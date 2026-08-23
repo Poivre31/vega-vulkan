@@ -9,8 +9,6 @@
 
 enum class time_unit : char { second, millisecond, microsecond, nanosecond };
 
-const time_unit default_time_unit = time_unit::millisecond;
-
 /** The global timer, starts at program startup and is always avalaible but
  * can't be paused, restarted or reset, always running */
 const std::string protected_global_timer = "global";
@@ -119,7 +117,7 @@ class timer {
   /** Prints time elapsed since timer creation, excluding time spent paused */
   static void print_elapsed_time(
       const std::string& name = main_timer,
-      time_unit unit          = default_time_unit,
+      time_unit unit          = time_unit::second,
       size_t precision        = 0
   ) noexcept;
 
@@ -128,19 +126,19 @@ class timer {
       const std::string& name,
       const vega_console& console,
       std::string_view message,
-      time_unit unit   = default_time_unit,
+      time_unit unit   = time_unit::second,
       size_t precision = 0
   ) noexcept;
 
   /** Prints time elapsed since timer creation, excluding time spent paused, for each timer still
    * existing TO OPTIMIZE*/
   static void
-  print_all_elapsed_times(time_unit unit = default_time_unit, size_t precision = 0) noexcept;
+  print_all_elapsed_times(time_unit unit = time_unit::second, size_t precision = 0) noexcept;
 
   /** Returns time elapsed since timer creation, excluding time spent paused */
   [[nodiscard]] static double get_elapsed_time(
       const std::string& name = main_timer,
-      time_unit unit          = default_time_unit
+      time_unit unit          = time_unit::second
   ) noexcept;
 
   /** Stops the execution of all threads until @param time has passed */
