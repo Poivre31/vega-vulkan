@@ -1,14 +1,15 @@
 
 struct PushConstants {
   //   float4x4 object_matrix;
-  //   float4x4 view_projection_matrix;
+  float4x4 view_projection_matrix;
   float time;
 };
 [[vk::push_constant]]
 ConstantBuffer<PushConstants> push_constants;
 
-static float2 positions[3] = float2[](float2(0.0, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5));
-static float2 uvs[3]       = float2[](float2(0., 0.), float2(1., 0.), float2(0., 1.));
+static float3 positions[3] =
+    float3[](float3(1.0, 0.0, 0.25), float3(1.0, 0.5, -0.25), float3(1.0, -0.5, -0.25));
+static float2 uvs[3] = float2[](float2(0., 0.), float2(1., 0.), float2(0., 1.));
 
 // struct VSInput {
 //   float3 position;
@@ -25,7 +26,8 @@ struct VertexOutput {
 [shader("vertex")]
 VertexOutput vertMain(uint vertex_id: SV_VertexID) {
   VertexOutput output;
-  output.position = float4(positions[vertex_id], 0, 1);
+  output.position = float4(positions[vertex_id], 1);
+  output.position = mul(push_constants.view_projection_matrix, output.position);
   // output.normal   = input.normal;
   output.uv       = uvs[vertex_id];
   // if(pushConstants.culled) {

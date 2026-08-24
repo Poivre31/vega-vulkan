@@ -30,7 +30,7 @@ constexpr auto color_space  = vk::ColorSpaceKHR::eSrgbNonlinear;
 
 constexpr uint32_t target_swapchain_image_count = 3;
 
-constexpr bool vsync = false;
+constexpr bool vsync = true;
 
 const std::string shader_path = "resources/shaders/lit_shader.spv";
 
@@ -129,7 +129,8 @@ create_shader_module(const vk::raii::Device& device, std::vector<char> shader_co
 }
 
 struct PushConstants {
-  float time;
+  glm::mat4x4 view_projection_matrix{};
+  float time{};
 };
 
 void transition_image_layout(
@@ -195,6 +196,13 @@ class vulkan_layer final : public Ilayer {
       return;
     }
     try {
+      if (get_app_context()->active_camera) {
+        _push_constants.view_projection_matrix =
+            get_app_context()->active_camera->get_view_projection_matrix();
+      } else {
+        throw std::runtime_error("No active camera set");
+        _push_constants.view_projection_matrix = glm::mat4x4{1.F};
+      }
       _push_constants.time = static_cast<float>(timer::get_elapsed_time());
       draw_frame();
     } catch (...) {

@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include "camera_class.hpp"
 
 struct application_context {
   SDL_Window* window = nullptr;
@@ -14,6 +15,14 @@ struct application_context {
   double last_dt_window_time    = 0.;
 
   uint64_t frame = 0;
+
+  Camera* active_camera = nullptr;
+  struct {
+    float x;
+    float y;
+    float dx;
+    float dy;
+  } mouse_data{};
 };
 
 class Ilayer {

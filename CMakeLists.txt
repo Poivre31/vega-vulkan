@@ -18,6 +18,8 @@ target_sources(VegaVulkan PRIVATE
     "include/layer.hpp"
     "include/application.hpp"
     include/vulkan/vulkan_layer.hpp
+    include/camera.hpp
+    include/camera_class.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 

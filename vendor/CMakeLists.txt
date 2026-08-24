@@ -8,6 +8,7 @@ add_subdirectory(vega/timer)
 
 # VMA
 add_subdirectory(vma-hpp/include)
+target_include_directories(vendor INTERFACE vma-hpp/VulkanMemoryAllocator/include)
 target_link_libraries(vendor INTERFACE VulkanMemoryAllocator-Hpp::VulkanMemoryAllocator-Hpp)
 target_compile_definitions(vendor INTERFACE VMA_IMPLEMENTATION )
 # END VMA
@@ -20,6 +21,11 @@ add_subdirectory(GLM)
 target_include_directories(vendor INTERFACE stb-image)
 target_compile_definitions(vendor INTERFACE STB_IMAGE_IMPLEMENTATION )
 # END STB
+
+# GLTF
+target_include_directories(vendor INTERFACE tinygltf)
+target_compile_definitions(vendor INTERFACE TINYGLTF_IMPLEMENTATION )
+# END GLTF
 
 # SDL3
 if(SDL3_ALREADY_CONFIGURED)

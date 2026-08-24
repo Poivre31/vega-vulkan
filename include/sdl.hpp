@@ -1,5 +1,6 @@
 #pragma once
-#include <SDL3/SDL.h>  // IWYU pragma: export
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_mouse.h>
 #include <console/console.hpp>
 #include <timer/timer.hpp>
 #include "layer.hpp"
@@ -40,6 +41,8 @@ class sdl_layer final : public Ilayer {
 
   void update(double dt) noexcept final {
     SDL_Event event{0};
+    get_app_context()->mouse_data.dx = 0;
+    get_app_context()->mouse_data.dy = 0;
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
         case (SDL_EVENT_QUIT):
@@ -50,6 +53,15 @@ class sdl_layer final : public Ilayer {
           if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
             get_app_context()->running = false;
           }
+          break;
+
+        case (SDL_EVENT_MOUSE_MOTION):
+          get_app_context()->mouse_data = {
+              .x  = event.motion.x,
+              .y  = event.motion.y,
+              .dx = -event.motion.xrel,
+              .dy = -event.motion.yrel
+          };
           break;
 
         case (SDL_EVENT_WINDOW_RESIZED):

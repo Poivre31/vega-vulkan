@@ -13,3 +13,6 @@
 [submodule "vendor/vma-hpp"]
 	path = vendor/vma-hpp
 	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp
+[submodule "vendor/tinygltf"]
+	path = vendor/tinygltf
+	url = https://github.com/syoyo/tinygltf

@@ -23,7 +23,8 @@ Checks: >
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-pro-type-reinterpret-cast,
-
+  -cppcoreguidelines-pro-type-union-access,
+  
   -altera-*,
   -android-*,
   -abseil-*,

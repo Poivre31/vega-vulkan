@@ -1,6 +1,8 @@
 #pragma once
 #include "layer.hpp"
 #include "sdl.hpp"
+#include "camera.hpp"
+#include "vulkan/vulkan_layer.hpp"
 #include <console/console.hpp>
 #include <concepts>
 #include <queue>
@@ -21,6 +23,8 @@ class application {
  public:
   application(std::string_view name) : _name(name) {
     push_layer<sdl_layer>();
+    push_layer<camera_layer>();
+    push_layer<vulkan_layer>();
     (push_layer<layers>(), ...);
     _console = console::create(_name);
   }

@@ -1,6 +1,5 @@
 #include <console/console.hpp>
 #include "application.hpp"
-#include "vulkan/vulkan_layer.hpp"
 
 class fps_layer final : public Ilayer {
  public:
@@ -18,6 +17,6 @@ class fps_layer final : public Ilayer {
 
 int main() {
   console::set_library_consoles_log_level(level::debug);
-  application<vulkan_layer> app("App");
+  application app("App");
   app.run();
 }
