@@ -20,6 +20,12 @@ target_sources(VegaVulkan PRIVATE
     include/vulkan/vulkan_layer.hpp
     include/camera.hpp
     include/camera_class.hpp
+    include/primitive_meshes.hpp
+    include/vulkan/single_command_buffer.hpp
+    include/vulkan/buffer.hpp
+    include/mesh.hpp
+    include/assets.hpp
+    include/vulkan_context.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 

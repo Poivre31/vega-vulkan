@@ -4,40 +4,9 @@
 #include <console/console.hpp>
 #include <SDL3/SDL_vulkan.h>
 #include "sdl.hpp"
+#include "vulkan_context.hpp"
 #include <fstream>
 #include <ios>
-
-namespace vulkan_config {
-
-const vk::ApplicationInfo vulkan_info{
-    .pApplicationName   = "Vega Vulkan",
-    .applicationVersion = vk::makeVersion(0, 1, 0),
-    .apiVersion         = vk::ApiVersion13
-};
-
-constexpr bool enable_validation = true;
-
-constexpr uint8_t max_number_of_exception_error = 10;
-
-const std::vector<const char*> requested_extensions        = {};
-const std::vector<const char*> requested_layers            = {"VK_LAYER_KHRONOS_validation"};
-const std::vector<const char*> requested_device_extensions = {
-    vk::KHRSwapchainExtensionName  //, vk::EXTPageableDeviceLocalMemoryExtensionName
-};
-
-constexpr auto color_format = vk::Format::eB8G8R8A8Srgb;
-constexpr auto color_space  = vk::ColorSpaceKHR::eSrgbNonlinear;
-
-constexpr uint32_t target_swapchain_image_count = 3;
-
-constexpr bool vsync = true;
-
-const std::string shader_path = "resources/shaders/lit_shader.spv";
-
-constexpr uint32_t frames_in_flight       = 2;
-constexpr vk::ClearColorValue clear_color = {0.9F, 0.1F, 0.2F, 1.F};
-
-}  // namespace vulkan_config
 
 inline vk::SurfaceFormatKHR get_swapchain_format(
     const vk::raii::PhysicalDevice& physical_device,
@@ -188,6 +157,15 @@ class vulkan_layer final : public Ilayer {
       return;
     }
     _initialised = true;
+
+    get_app_context()->vulkan_context = {
+        .physical_device       = &_physical_device,
+        .graphics_queue_family = _graphics_queue_family,
+        .graphics_queue        = &_graphics_queue,
+        .device                = &_device,
+        .allocator             = &_allocator,
+        .command_pool          = &_command_pool,
+    };
     _console->info("Vulkan was successfully initialised");
   }
 
@@ -524,15 +502,14 @@ class vulkan_layer final : public Ilayer {
         {.stage = vk::ShaderStageFlagBits::eFragment, .module = shader_module, .pName = "fragMain"}
     };
 
-    // auto bindingDescription   = Vertex3D::getBindingDescription();
-    // auto attributeDescription = Vertex3D::getAttributeDescriptions();
-    // vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
-    //     .vertexBindingDescriptionCount   = 1,
-    //     .pVertexBindingDescriptions      = &bindingDescription,
-    //     .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size()),
-    //     .pVertexAttributeDescriptions    = attributeDescription.data()
-    // };
-    vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
+    auto bindingDescription   = vertex_3D::binding_description();
+    auto attributeDescription = vertex_3D::attribute_description();
+    vk::PipelineVertexInputStateCreateInfo vertex_input_info{
+        .vertexBindingDescriptionCount   = 1,
+        .pVertexBindingDescriptions      = &bindingDescription,
+        .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size()),
+        .pVertexAttributeDescriptions    = attributeDescription.data()
+    };
 
     vk::PipelineInputAssemblyStateCreateInfo input_assembly_info{
         .topology = vk::PrimitiveTopology::eTriangleList,
@@ -710,7 +687,9 @@ class vulkan_layer final : public Ilayer {
         _push_constants
     );
 
-    command_buffer.draw(3, 1, 0, 0);
+    for (auto& mesh : *get_app_context()->resources.meshes) {
+      mesh.render(command_buffer);
+    }
 
     command_buffer.endRendering();
 

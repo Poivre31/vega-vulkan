@@ -3,6 +3,7 @@
 #include "sdl.hpp"
 #include "camera.hpp"
 #include "vulkan/vulkan_layer.hpp"
+#include "assets.hpp"
 #include <console/console.hpp>
 #include <concepts>
 #include <queue>
@@ -22,23 +23,42 @@ template <application_layer... layers>
 class application {
  public:
   application(std::string_view name) : _name(name) {
+    _console = console::create(_name);
     push_layer<sdl_layer>();
     push_layer<camera_layer>();
     push_layer<vulkan_layer>();
+    push_layer<assets_layer>();
     (push_layer<layers>(), ...);
-    _console = console::create(_name);
   }
+  ~application() {
+    while (!_layers.empty()) {
+      _layers.pop_back();
+    }
+  }
+
+  application(application&)                  = delete;
+  application(application&&)                 = delete;
+  application& operator=(const application&) = delete;
+  application& operator=(application&&)      = delete;
 
   void run() noexcept {
     timer::create(_name);
     for (auto& layer : _layers) {
       layer->init();
     }
+
     _context.running = true;
     timer::log_time_to_console(
         _name, _console, "Initialised application in", time_unit::millisecond
     );
     timer::create("runtime");
+
+    if (!is_context_valid(_context)) {
+      _console->error(
+          "Not all context resources have been assigned, aborting to avoid null ptr dereferencing"
+      );
+      _context.running = false;
+    }
 
     timer::create("frame-time");
     _frame_times.push(_context.time);

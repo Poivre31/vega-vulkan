@@ -7,15 +7,15 @@ struct PushConstants {
 [[vk::push_constant]]
 ConstantBuffer<PushConstants> push_constants;
 
-static float3 positions[3] =
-    float3[](float3(1.0, 0.0, 0.25), float3(1.0, 0.5, -0.25), float3(1.0, -0.5, -0.25));
-static float2 uvs[3] = float2[](float2(0., 0.), float2(1., 0.), float2(0., 1.));
+// static float3 positions[3] =
+//     float3[](float3(1.0, 0.0, 0.25), float3(1.0, 0.5, -0.25), float3(1.0, -0.5, -0.25));
+// static float2 uvs[3] = float2[](float2(0., 0.), float2(1., 0.), float2(0., 1.));
 
-// struct VSInput {
-//   float3 position;
-//   float3 normal;
-//   float2 uv;
-// };
+struct VSInput {
+  float3 position;
+  float3 normal;
+  float2 uv;
+};
 
 struct VertexOutput {
   float4 position : SV_Position;
@@ -24,12 +24,12 @@ struct VertexOutput {
 };
 
 [shader("vertex")]
-VertexOutput vertMain(uint vertex_id: SV_VertexID) {
+VertexOutput vertMain(VSInput vertex, uint vertex_id: SV_VertexID) {
   VertexOutput output;
-  output.position = float4(positions[vertex_id], 1);
+  output.position = float4(vertex.position, 1);
   output.position = mul(push_constants.view_projection_matrix, output.position);
   // output.normal   = input.normal;
-  output.uv       = uvs[vertex_id];
+  output.uv       = vertex.uv;
   // if(pushConstants.culled) {
   //     output.color *= float3(1.0,0.3,0.2);
   // }
