@@ -14,6 +14,7 @@ target_compile_definitions(vendor INTERFACE VMA_IMPLEMENTATION )
 # END VMA
 
 # GLM
+target_compile_definitions(vendor INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 add_subdirectory(GLM)
 # END GLM
 

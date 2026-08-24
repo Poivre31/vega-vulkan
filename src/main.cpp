@@ -7,7 +7,9 @@ class fps_layer final : public Ilayer {
   void init() noexcept final {}
   void update(double dt) noexcept final {}
   void fixed_update(double dt) noexcept final {
-    _console->info("Rendering at {:.2f}, avg {:.2f}", 1. / dt, 1. / get_app_context()->avg_dt);
+    _console->info(
+        "Physics at {:.2f}fps, rendering at avg {:.2f}fps", 1. / dt, 1. / get_app_context()->avg_dt
+    );
   }
   void cleanup() noexcept final {}
 
@@ -17,6 +19,6 @@ class fps_layer final : public Ilayer {
 
 int main() {
   console::set_library_consoles_log_level(level::debug);
-  application app("App");
+  application<fps_layer> app("App");
   app.run();
 }

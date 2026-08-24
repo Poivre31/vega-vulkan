@@ -32,11 +32,12 @@ constexpr auto color_space  = vk::ColorSpaceKHR::eSrgbNonlinear;
 
 constexpr uint32_t target_swapchain_image_count = 3;
 
-constexpr bool vsync = true;
+constexpr bool vsync = false;
 
 const std::string shader_path = "resources/shaders/lit_shader.spv";
 
-constexpr uint32_t frames_in_flight       = 2;
-constexpr vk::ClearColorValue clear_color = {0.9F, 0.1F, 0.2F, 1.F};
+constexpr uint32_t frames_in_flight  = 2;
+constexpr vk::ClearValue clear_color = vk::ClearColorValue(0.9F, 0.1F, 0.2F, 1.F);
+constexpr vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.F, 0);
 
 }  // namespace vulkan_config

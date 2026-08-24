@@ -26,6 +26,7 @@ target_sources(VegaVulkan PRIVATE
     include/mesh.hpp
     include/assets.hpp
     include/vulkan_context.hpp
+    include/image.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 

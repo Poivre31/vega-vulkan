@@ -7,6 +7,7 @@
 #include "vulkan_context.hpp"
 #include <fstream>
 #include <ios>
+#include "image.hpp"
 
 inline vk::SurfaceFormatKHR get_swapchain_format(
     const vk::raii::PhysicalDevice& physical_device,
@@ -103,14 +104,15 @@ struct PushConstants {
 };
 
 void transition_image_layout(
-    vk::Image& image,
+    const vk::Image& image,
     vk::raii::CommandBuffer& command_buffer,
     vk::ImageLayout old_layout,
     vk::ImageLayout new_layout,
     vk::AccessFlags2 src_access_mask,
     vk::AccessFlags2 dst_access_mask,
     vk::PipelineStageFlags2 src_stage_mask,
-    vk::PipelineStageFlags2 dst_stage_mask
+    vk::PipelineStageFlags2 dst_stage_mask,
+    vk::ImageAspectFlags aspect
 ) {
   vk::ImageMemoryBarrier2 barrier = {
       .srcStageMask        = src_stage_mask,
@@ -123,7 +125,7 @@ void transition_image_layout(
       .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
       .image               = image,
       .subresourceRange    = {
-          .aspectMask     = vk::ImageAspectFlagBits::eColor,
+          .aspectMask     = aspect,
           .baseMipLevel   = 0,
           .levelCount     = 1,
           .baseArrayLayer = 0,
@@ -150,6 +152,8 @@ class vulkan_layer final : public Ilayer {
       initialize_vma();
       create_swapchain();
       create_graphics_pipeline();
+      create_command_pool();
+      create_depth_resources();
       create_command_buffer();
       create_synchronisation_objects();
     } catch (...) {
@@ -557,8 +561,8 @@ class vulkan_layer final : public Ilayer {
     };
 
     vk::PipelineDepthStencilStateCreateInfo depth_stencil{
-        .depthTestEnable       = vk::False,
-        .depthWriteEnable      = vk::False,
+        .depthTestEnable       = vk::True,
+        .depthWriteEnable      = vk::True,
         .depthCompareOp        = vk::CompareOp::eLess,
         .depthBoundsTestEnable = vk::False,
         .stencilTestEnable     = vk::False
@@ -600,7 +604,7 @@ class vulkan_layer final : public Ilayer {
     vk::PipelineRenderingCreateInfo pipeline_rendering_info{
         .colorAttachmentCount    = 1,
         .pColorAttachmentFormats = &_swapchain_format.format,
-        // .depthAttachmentFormat   = vk::Format::eD32Sfloat
+        .depthAttachmentFormat   = vk::Format::eD32Sfloat
     };
 
     vk::StructureChain<
@@ -616,13 +620,42 @@ class vulkan_layer final : public Ilayer {
     );
   }
 
-  void create_command_buffer() {
+  void create_command_pool() {
     vk::CommandPoolCreateInfo pool_info{
         .flags            = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
         .queueFamilyIndex = _graphics_queue_family
     };
     _command_pool = vk::raii::CommandPool(_device, pool_info);
+  }
 
+  void create_depth_resources() {
+    _depth_image = create_image(
+        _allocator,
+        _device,
+        vk::Format::eD32Sfloat,
+        _swapchain_extent.width,
+        _swapchain_extent.height,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment,
+        vk::ImageAspectFlagBits::eDepth
+    );
+    auto cmd = begin_single_command_buffer(_command_pool, _device);
+    transition_image_layout(
+        *_depth_image.image,
+        cmd,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eDepthAttachmentOptimal,
+        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        vk::PipelineStageFlagBits2::eEarlyFragmentTests
+            | vk::PipelineStageFlagBits2::eLateFragmentTests,
+        vk::PipelineStageFlagBits2::eEarlyFragmentTests
+            | vk::PipelineStageFlagBits2::eLateFragmentTests,
+        vk::ImageAspectFlagBits::eDepth
+    );
+    submit_single_command_buffer(_graphics_queue, std::move(cmd));
+  }
+
+  void create_command_buffer() {
     vk::CommandBufferAllocateInfo command_buffer_info{
         .commandPool        = _command_pool,
         .level              = vk::CommandBufferLevel::ePrimary,  // Secondary is called from primary
@@ -645,7 +678,8 @@ class vulkan_layer final : public Ilayer {
         {},
         vk::AccessFlagBits2::eColorAttachmentWrite,
         vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::ImageAspectFlagBits::eColor
     );
 
     vk::RenderingAttachmentInfo color_attachment_info{
@@ -656,11 +690,20 @@ class vulkan_layer final : public Ilayer {
         .clearValue  = vulkan_config::clear_color
     };
 
+    vk::RenderingAttachmentInfo depth_attachment_info{
+        .imageView   = _depth_image.view,
+        .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+        .loadOp      = vk::AttachmentLoadOp::eClear,
+        .storeOp     = vk::AttachmentStoreOp::eDontCare,
+        .clearValue  = vulkan_config::clear_depth
+    };
+
     vk::RenderingInfo renderingInfo{
         .renderArea           = {.offset = {.x = 0, .y = 0}, .extent = _swapchain_extent},
         .layerCount           = 1,
         .colorAttachmentCount = 1,
         .pColorAttachments    = &color_attachment_info,
+        .pDepthAttachment     = &depth_attachment_info,
     };
 
     command_buffer.beginRendering(renderingInfo);
@@ -701,7 +744,8 @@ class vulkan_layer final : public Ilayer {
         vk::AccessFlagBits2::eColorAttachmentWrite,
         {},
         vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eBottomOfPipe
+        vk::PipelineStageFlagBits2::eBottomOfPipe,
+        vk::ImageAspectFlagBits::eColor
     );
 
     command_buffer.end();
@@ -813,6 +857,9 @@ class vulkan_layer final : public Ilayer {
   vk::raii::PipelineLayout _pipeline_layout = nullptr;
 
   vk::raii::CommandPool _command_pool = nullptr;
+
+  gpu_image _depth_image;
+
   std::vector<vk::raii::CommandBuffer> _command_buffers;
   uint32_t _frame_index = 0;
   std::vector<vk::raii::Semaphore> _presentation_semaphores;
