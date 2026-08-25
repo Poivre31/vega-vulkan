@@ -96,10 +96,10 @@ class stb_image {
       }
     } catch (const std::filesystem::filesystem_error& e) {
       console::get(consoles::assets)
-          ->error("Filesystem error loading '{}': {}", image_path, e.what());
+          ->error("Filesystem error loading image '{}': {}", image_path, e.what());
     } catch (const std::exception& e) {
       console::get(consoles::assets)
-          ->error("Unexpected error loading '{}': {}", image_path, e.what());
+          ->error("Unexpected error loading image '{}': {}", image_path, e.what());
     }
   }
 

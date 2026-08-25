@@ -28,6 +28,11 @@ target_include_directories(vendor INTERFACE tinygltf)
 target_compile_definitions(vendor INTERFACE TINYGLTF_IMPLEMENTATION )
 # END GLTF
 
+# OBJ
+target_include_directories(vendor INTERFACE tinyobj)
+target_compile_definitions(vendor INTERFACE TINYOBJLOADER_IMPLEMENTATION TINYOBJLOADER_USE_MAPBOX_EARCUT)
+# END OBJ
+
 # SDL3
 if(SDL3_ALREADY_CONFIGURED)
     return()

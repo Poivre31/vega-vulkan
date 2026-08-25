@@ -277,7 +277,10 @@ class vulkan_layer final : public Ilayer {
     }
 
     // SELECTING LAYERS
-    std::vector<const char*> layers(vulkan_config::requested_layers);
+    std::vector<const char*> layers;
+    if (vulkan_config::enable_validation) {
+      layers = vulkan_config::requested_layers;
+    }
 
     _console->warn("TO DO: check that requested extensions and layers are supported");
 
@@ -493,7 +496,7 @@ class vulkan_layer final : public Ilayer {
     _swapchain_views.clear();
     _swapchain_images.clear();
     create_swapchain();
-    // createDepthRessources();
+    create_depth_resources();
   }
 
   void create_graphics_pipeline() {
@@ -538,7 +541,7 @@ class vulkan_layer final : public Ilayer {
         .rasterizerDiscardEnable = vk::False,
         .polygonMode             = vk::PolygonMode::eFill,
         .cullMode                = vk::CullModeFlagBits::eNone,
-        .frontFace               = vk::FrontFace::eClockwise,
+        .frontFace               = vk::FrontFace::eCounterClockwise,
         .depthBiasEnable         = vk::False,
         .lineWidth               = 1.0F
     };

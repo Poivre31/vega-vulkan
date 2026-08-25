@@ -17,16 +17,17 @@ target_sources(VegaVulkan PRIVATE
     "include/sdl.hpp"
     "include/layer.hpp"
     "include/application.hpp"
-    include/vulkan/vulkan_layer.hpp
-    include/camera.hpp
-    include/camera_class.hpp
-    include/primitive_meshes.hpp
-    include/vulkan/single_command_buffer.hpp
-    include/vulkan/buffer.hpp
-    include/mesh.hpp
-    include/assets.hpp
-    include/vulkan_context.hpp
-    include/image.hpp
+    "include/vulkan/vulkan_layer.hpp"
+    "include/camera.hpp"
+    "include/camera_class.hpp"
+    "include/primitive_meshes.hpp"
+    "include/vulkan/single_command_buffer.hpp"
+    "include/vulkan/buffer.hpp"
+    "include/mesh.hpp"
+    "include/assets.hpp"
+    "include/vulkan_context.hpp"
+    "include/image.hpp"
+    "include/object_loader.hpp"
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 

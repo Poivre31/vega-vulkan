@@ -17,12 +17,19 @@ const vk::ApplicationInfo vulkan_info{
     .apiVersion         = vk::ApiVersion13
 };
 
+#ifdef NDEBUG
+constexpr bool enable_validation = false;
+#else
 constexpr bool enable_validation = true;
+#endif
 
 constexpr uint8_t max_number_of_exception_error = 10;
 
-const std::vector<const char*> requested_extensions        = {};
-const std::vector<const char*> requested_layers            = {"VK_LAYER_KHRONOS_validation"};
+const std::vector<const char*> requested_extensions = {};
+const std::vector<const char*> requested_layers     = {
+    "VK_LAYER_KHRONOS_validation",
+    "VK_LAYER_LUNARG_monitor"
+};
 const std::vector<const char*> requested_device_extensions = {
     vk::KHRSwapchainExtensionName  //, vk::EXTPageableDeviceLocalMemoryExtensionName
 };

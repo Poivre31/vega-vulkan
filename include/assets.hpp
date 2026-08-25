@@ -3,12 +3,15 @@
 #include "layer.hpp"
 #include "mesh.hpp"
 #include "primitive_meshes.hpp"
+#include "object_loader.hpp"
 
 class assets_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
   void init() noexcept final {
     try {
+      // _meshes.emplace_back(load_object("resources/models/bunny.obj"));
+      _meshes.emplace_back(load_object("resources/models/tyra.obj"));
       _meshes.emplace_back(create_cube({1.F, 0.F, 0.F}, 0.3F));
       for (auto& mesh : _meshes) {
         mesh.create_vertex_buffer(get_app_context()->vulkan_context);
