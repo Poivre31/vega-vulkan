@@ -247,9 +247,9 @@ class vulkan_layer final : public Ilayer {
     }
 
     // SELECTING LAYERS
-    std::vector<const char*> layers = vulkan_config::requested_layers;
+    std::vector<const char*> layers;
     if (vulkan_config::enable_validation) {
-      layers.push_back("VK_LAYER_KHRONOS_validation");
+      layers = vulkan_config::requested_layers;
     }
 
     _console->warn("TO DO: check that requested extensions and layers are supported");

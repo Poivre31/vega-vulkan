@@ -27,9 +27,8 @@ constexpr bool enable_validation = true;
 
 constexpr uint8_t max_number_of_exception_error = 10;
 
-const std::vector<const char*> requested_extensions = {};
-const std::vector<const char*> requested_layers = {"VK_LAYER_LUNARG_monitor"};  // VK_LAYER_KHRONOS_validation
-                                                                                // handled elsewhere
+const std::vector<const char*> requested_extensions        = {};
+const std::vector<const char*> requested_layers            = {"VK_LAYER_KHRONOS_validation"};
 const std::vector<const char*> requested_device_extensions = {
     vk::KHRSwapchainExtensionName  //, vk::EXTPageableDeviceLocalMemoryExtensionName
 };

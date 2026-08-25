@@ -28,6 +28,7 @@ target_sources(VegaVulkan PRIVATE
     "include/vulkan_context.hpp"
     "include/image.hpp"
     "include/object_loader.hpp"
+    include/global_config.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 
