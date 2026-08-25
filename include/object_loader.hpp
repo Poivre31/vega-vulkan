@@ -57,13 +57,13 @@ std::vector<vertex_3D> load_object(const std::string& model_path) {  // NOLINT
           tinyobj::index_t idx = shape.mesh.indices[shape_offset + v];
           vertex_3D vertex;
           vertex.position.x = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 0];
-          vertex.position.z = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 1];
-          vertex.position.y = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 2];
+          vertex.position.y = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 1];
+          vertex.position.z = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 2];
 
           if (idx.normal_index >= 0) {
             vertex.normal.x = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 0];
-            vertex.normal.z = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 1];
-            vertex.normal.y = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 2];
+            vertex.normal.y = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 1];
+            vertex.normal.z = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 2];
           }
 
           if (idx.texcoord_index >= 0) {

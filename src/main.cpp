@@ -19,6 +19,6 @@ class fps_layer final : public Ilayer {
 
 int main() {
   console::set_library_consoles_log_level(level::debug);
-  application<fps_layer> app("App");
+  application<> app("App");
   app.run();
 }

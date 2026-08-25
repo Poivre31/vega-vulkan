@@ -2,9 +2,12 @@
 #include <SDL3/SDL.h>
 #include "camera_class.hpp"
 #include "mesh.hpp"
+#include "image.hpp"
 
 struct resources_data {
-  std::vector<mesh_3D>* meshes = nullptr;
+  std::vector<mesh_3D>* meshes             = nullptr;
+  std::vector<gpu_image>* textures         = nullptr;
+  vk::raii::DescriptorSets descriptor_sets = nullptr;
 };
 
 struct application_context {

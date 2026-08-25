@@ -103,41 +103,6 @@ struct PushConstants {
   float time{};
 };
 
-void transition_image_layout(
-    const vk::Image& image,
-    vk::raii::CommandBuffer& command_buffer,
-    vk::ImageLayout old_layout,
-    vk::ImageLayout new_layout,
-    vk::AccessFlags2 src_access_mask,
-    vk::AccessFlags2 dst_access_mask,
-    vk::PipelineStageFlags2 src_stage_mask,
-    vk::PipelineStageFlags2 dst_stage_mask,
-    vk::ImageAspectFlags aspect
-) {
-  vk::ImageMemoryBarrier2 barrier = {
-      .srcStageMask        = src_stage_mask,
-      .srcAccessMask       = src_access_mask,
-      .dstStageMask        = dst_stage_mask,
-      .dstAccessMask       = dst_access_mask,
-      .oldLayout           = old_layout,
-      .newLayout           = new_layout,
-      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .image               = image,
-      .subresourceRange    = {
-          .aspectMask     = aspect,
-          .baseMipLevel   = 0,
-          .levelCount     = 1,
-          .baseArrayLayer = 0,
-          .layerCount     = 1
-      }
-  };
-  vk::DependencyInfo dependency_info = {
-      .dependencyFlags = {}, .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier
-  };
-  command_buffer.pipelineBarrier2(dependency_info);
-}
-
 class vulkan_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
@@ -151,9 +116,13 @@ class vulkan_layer final : public Ilayer {
       create_logical_device();
       initialize_vma();
       create_swapchain();
+      create_descriptor_set_layouts();
       create_graphics_pipeline();
       create_command_pool();
       create_depth_resources();
+      create_texture_sampler();
+      create_descriptor_pools();
+      create_descriptor_sets();
       create_command_buffer();
       create_synchronisation_objects();
     } catch (...) {
@@ -169,6 +138,7 @@ class vulkan_layer final : public Ilayer {
         .device                = &_device,
         .allocator             = &_allocator,
         .command_pool          = &_command_pool,
+        .descriptor_sets       = &_descriptor_sets,
     };
     _console->info("Vulkan was successfully initialised");
   }
@@ -277,9 +247,9 @@ class vulkan_layer final : public Ilayer {
     }
 
     // SELECTING LAYERS
-    std::vector<const char*> layers;
+    std::vector<const char*> layers = vulkan_config::requested_layers;
     if (vulkan_config::enable_validation) {
-      layers = vulkan_config::requested_layers;
+      layers.push_back("VK_LAYER_KHRONOS_validation");
     }
 
     _console->warn("TO DO: check that requested extensions and layers are supported");
@@ -367,11 +337,13 @@ class vulkan_layer final : public Ilayer {
     vk::StructureChain<
         vk::PhysicalDeviceFeatures2,
         vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceVulkan12Features,
         vk::PhysicalDeviceVulkan13Features,
         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>
         featureChain = {
             {.features = {.samplerAnisotropy = vk::True}},
             {.shaderDrawParameters = vk::True},
+            {.runtimeDescriptorArray = vk::True},
             {
                 .synchronization2 = vk::True,
                 .dynamicRendering = vk::True,
@@ -499,6 +471,33 @@ class vulkan_layer final : public Ilayer {
     create_depth_resources();
   }
 
+  void create_descriptor_set_layouts() {
+    std::vector<vk::DescriptorSetLayoutBinding> layout_bindings{vk::DescriptorSetLayoutBinding{
+        .binding         = 0,
+        .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
+        .descriptorCount = vulkan_config::max_number_of_textures,
+        .stageFlags      = vk::ShaderStageFlagBits::eFragment
+    }};
+
+    // std::vector<vk::DescriptorBindingFlags> flags{vk::DescriptorBindingFlags{
+    //     vk::DescriptorBindingFlagBits::ePartiallyBound
+    //     | vk::DescriptorBindingFlagBits::eUpdateAfterBind
+    // }};
+
+    // vk::DescriptorSetLayoutBindingFlagsCreateInfo flags_info{
+    //     .bindingCount = static_cast<uint32_t>(flags.size()), .pBindingFlags = flags.data()
+    // };
+
+    vk::DescriptorSetLayoutCreateInfo layout_info{
+        // .pNext        = &flags_info,
+        // .flags        = vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool,
+        .bindingCount = static_cast<uint32_t>(layout_bindings.size()),
+        .pBindings    = layout_bindings.data()
+    };
+
+    _descriptor_set_layout = vk::raii::DescriptorSetLayout(_device, layout_info);
+  }
+
   void create_graphics_pipeline() {
     vk::raii::ShaderModule shader_module = create_shader_module(
         _device, read_file(vulkan_config::shader_path)
@@ -541,7 +540,7 @@ class vulkan_layer final : public Ilayer {
         .rasterizerDiscardEnable = vk::False,
         .polygonMode             = vk::PolygonMode::eFill,
         .cullMode                = vk::CullModeFlagBits::eNone,
-        .frontFace               = vk::FrontFace::eCounterClockwise,
+        .frontFace               = vk::FrontFace::eClockwise,
         .depthBiasEnable         = vk::False,
         .lineWidth               = 1.0F
     };
@@ -584,7 +583,10 @@ class vulkan_layer final : public Ilayer {
     };
 
     vk::PipelineLayoutCreateInfo pipeline_layout_info{
-        .pushConstantRangeCount = 1, .pPushConstantRanges = &push_constants_range
+        .setLayoutCount         = 1,
+        .pSetLayouts            = &*_descriptor_set_layout,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges    = &push_constants_range,
     };
 
     _pipeline_layout = vk::raii::PipelineLayout(_device, pipeline_layout_info);
@@ -658,6 +660,87 @@ class vulkan_layer final : public Ilayer {
     submit_single_command_buffer(_graphics_queue, std::move(cmd));
   }
 
+  void create_texture_sampler() {
+    auto properties = _physical_device.getProperties();
+    vk::SamplerCreateInfo sampler_info{
+        .magFilter               = vk::Filter::eNearest,
+        .minFilter               = vk::Filter::eNearest,
+        .mipmapMode              = vk::SamplerMipmapMode::eNearest,
+        .addressModeU            = vk::SamplerAddressMode::eRepeat,
+        .addressModeV            = vk::SamplerAddressMode::eRepeat,
+        .addressModeW            = vk::SamplerAddressMode::eRepeat,
+        .mipLodBias              = 0.0F,
+        .anisotropyEnable        = vk::True,
+        .maxAnisotropy           = properties.limits.maxSamplerAnisotropy,
+        .compareEnable           = vk::False,
+        .compareOp               = vk::CompareOp::eAlways,
+        .minLod                  = 0.0F,
+        .maxLod                  = 0.0F,
+        .borderColor             = vk::BorderColor::eIntOpaqueBlack,
+        .unnormalizedCoordinates = vk::False
+    };
+
+    _image_sampler = vk::raii::Sampler(_device, sampler_info);
+  }
+
+  void create_descriptor_pools() {
+    std::vector<vk::DescriptorPoolSize> pool_sizes{vk::DescriptorPoolSize{
+        .type            = vk::DescriptorType::eCombinedImageSampler,
+        .descriptorCount = vulkan_config::frames_in_flight * vulkan_config::max_number_of_textures
+    }};
+    vk::DescriptorPoolCreateInfo pool_info{
+        .flags         = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+        //  | vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+        .maxSets       = vulkan_config::frames_in_flight,
+        .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+        .pPoolSizes    = pool_sizes.data()
+    };
+
+    _descriptor_pool = vk::raii::DescriptorPool(_device, pool_info);
+  }
+
+  void create_descriptor_sets() {
+    std::vector<vk::DescriptorSetLayout> layouts(
+        vulkan_config::frames_in_flight, *_descriptor_set_layout
+    );
+    vk::DescriptorSetAllocateInfo descriptor_set_info{
+        .descriptorPool     = _descriptor_pool,
+        .descriptorSetCount = vulkan_config::frames_in_flight,
+        .pSetLayouts        = layouts.data()
+    };
+
+    _descriptor_sets = _device.allocateDescriptorSets(descriptor_set_info);
+
+    // stb_image beer;
+    // beer.load("resources/textures/ber.png");
+    // vulkan_context ah = {
+    //     .graphics_queue = &_graphics_queue,
+    //     .device         = &_device,
+    //     .allocator      = &_allocator,
+    //     .command_pool   = &_command_pool,
+    // };
+    // image = load_texture_to_gpu(ah, std::move(beer));
+
+    // for (uint32_t i = 0; i < vulkan_config::frames_in_flight; i++) {
+    //   vk::DescriptorImageInfo imageInfo{
+    //       .sampler     = _image_sampler,
+    //       .imageView   = image.view,
+    //       .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+    //   };
+
+    //   std::vector<vk::WriteDescriptorSet> write_descriptor_set{vk::WriteDescriptorSet{
+    //       .dstSet          = _descriptor_sets.at(i),
+    //       .dstBinding      = 0,
+    //       .dstArrayElement = 0,
+    //       .descriptorCount = 1,
+    //       .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
+    //       .pImageInfo      = &imageInfo
+    //   }};
+
+    //   _device.updateDescriptorSets(write_descriptor_set, {});
+    // }
+  }
+
   void create_command_buffer() {
     vk::CommandBufferAllocateInfo command_buffer_info{
         .commandPool        = _command_pool,
@@ -725,6 +808,14 @@ class vulkan_layer final : public Ilayer {
         }
     );
     command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapchain_extent));
+
+    command_buffer.bindDescriptorSets(
+        vk::PipelineBindPoint::eGraphics,
+        _pipeline_layout,
+        0,
+        *_descriptor_sets.at(_frame_index),
+        nullptr
+    );
 
     command_buffer.pushConstants<PushConstants>(
         _pipeline_layout,
@@ -863,8 +954,16 @@ class vulkan_layer final : public Ilayer {
 
   gpu_image _depth_image;
 
+  vk::raii::Sampler _image_sampler = nullptr;
+
+  vk::raii::DescriptorSetLayout _descriptor_set_layout = nullptr;
+  vk::raii::DescriptorPool _descriptor_pool            = nullptr;
+  vk::raii::DescriptorSets _descriptor_sets            = nullptr;
+
   std::vector<vk::raii::CommandBuffer> _command_buffers;
   uint32_t _frame_index = 0;
   std::vector<vk::raii::Semaphore> _presentation_semaphores;
   std::vector<vk::raii::Fence> _draw_fences;
+
+  gpu_image image;
 };

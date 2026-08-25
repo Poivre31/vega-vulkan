@@ -139,6 +139,9 @@ class stb_image {
     return _image_loaded ? _channels : fallback_image_channels;
   }
   [[nodiscard]] int pitch() const noexcept { return width() * channels(); }
+  [[nodiscard]] uint64_t byte_size() const noexcept {
+    return uint64_t(width()) * uint64_t(height()) * uint64_t(channels()) * sizeof(stbi_uc);
+  }
 
  private:
   stb_image_ptr _data{nullptr, &stbi_image_free};

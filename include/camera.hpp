@@ -69,6 +69,6 @@ class camera_layer final : public Ilayer {
  private:
   std::vector<Camera> _cameras;
   Camera* _active_camera = nullptr;
-  float _camera_speed    = 1.F;
+  float _camera_speed    = 2.F;
   vega_console _console  = console::create("Camera");
 };
