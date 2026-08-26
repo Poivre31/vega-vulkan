@@ -9,7 +9,7 @@
 class assets_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
-  void init() noexcept final {
+  bool init() noexcept final {
     try {
       vulkan_context context = get_app_context()->vulkan_context;
       _meshes.emplace_back(load_object("resources/models/viking_room.obj"));
@@ -80,6 +80,8 @@ class assets_layer final : public Ilayer {
     } catch (...) {
       console::get(consoles::assets)->error("Unknown error during assets initialisation {}");
     }
+
+    return true;
   }
   void update(double dt) noexcept final {}
   void cleanup() noexcept final {}

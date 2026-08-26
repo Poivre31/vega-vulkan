@@ -21,8 +21,10 @@ struct application_context {
   double avg_dt                 = 0.;
   double last_fixed_update_time = 0.;
   double last_dt_window_time    = 0.;
+  double fixed_time             = 0.;
 
-  uint64_t frame = 0;
+  uint64_t frame       = 0;
+  uint64_t fixed_frame = 0;
 
   Camera* active_camera = nullptr;
   struct {
@@ -55,7 +57,7 @@ class Ilayer {
   Ilayer& operator=(const Ilayer&) = default;
   Ilayer& operator=(Ilayer&&)      = default;
 
-  virtual void init() noexcept            = 0;
+  virtual bool init() noexcept            = 0;
   virtual void update(double dt) noexcept = 0;
   virtual void fixed_update(double time_step) noexcept {};
   virtual void cleanup() noexcept = 0;

@@ -15,15 +15,15 @@ struct sdl_exception : public std::runtime_error {
 class sdl_layer final : public Ilayer {
   using Ilayer::Ilayer;
 
-  void init() noexcept final {
+  bool init() noexcept final {
     auto timer = scoped_timer("sdl-init");
 
     bool success = SDL_Init(SDL_INIT_VIDEO);
     if (!success) {
       console::get(consoles::graphics)
-          ->error("SDL error during initialisation : {:s}\nAborting program", SDL_GetError());
+          ->error("SDL error during initialisation : {:s}\nExiting program", SDL_GetError());
       cleanup();
-      std::abort();
+      return false;
     }
 
     get_app_context()->window = SDL_CreateWindow(
@@ -34,10 +34,12 @@ class sdl_layer final : public Ilayer {
     );
     if (!get_app_context()->window) {
       console::get(consoles::graphics)
-          ->error("SDL error during window creation : {:s}\nAborting program", SDL_GetError());
+          ->error("SDL error during window creation : {:s}\nExiting program", SDL_GetError());
       cleanup();
-      std::abort();
+      return false;
     }
+
+    return true;
   }
 
   void update(double dt) noexcept final {

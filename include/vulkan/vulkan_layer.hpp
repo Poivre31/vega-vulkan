@@ -1,6 +1,7 @@
 #pragma once
 #include "layer.hpp"
 #include "graphics.hpp"
+#include <algorithm>
 #include <console/console.hpp>
 #include <SDL3/SDL_vulkan.h>
 #include "sdl.hpp"
@@ -8,6 +9,40 @@
 #include <fstream>
 #include <ios>
 #include "image.hpp"
+
+inline bool is_device_suitable(const vk::raii::PhysicalDevice& device) {
+  auto device_properties = device.getProperties();
+  auto device_features   = device.getFeatures();
+
+  if (device_properties.apiVersion < vk::ApiVersion13) {
+    return false;
+  }
+
+  auto available_queue_families = device.getQueueFamilyProperties();
+  if (std::none_of(// NOLINT
+          available_queue_families.begin(),
+          available_queue_families.end(),
+          [](auto const& queue_properties) {
+            return queue_properties.queueFlags & vk::QueueFlagBits::eGraphics;
+          }
+      )) {
+    return false;
+  }
+
+  auto available_device_extensions = device.enumerateDeviceExtensionProperties();
+
+  for (const auto* extension : vulkan_config::requested_device_extensions) {
+    if (std::ranges::none_of(
+            available_device_extensions, [extension](auto const& avaibleExtension) {
+              return strcmp(avaibleExtension.extensionName, extension) == 0;
+            }
+        )) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 inline vk::SurfaceFormatKHR get_swapchain_format(
     const vk::raii::PhysicalDevice& physical_device,
@@ -107,7 +142,7 @@ class vulkan_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
 
-  void init() noexcept final {
+  bool init() noexcept final {
     try {
       create_instance();
       setup_console_callback();
@@ -127,7 +162,7 @@ class vulkan_layer final : public Ilayer {
       create_synchronisation_objects();
     } catch (...) {
       handle_exception("initialisation");
-      return;
+      return false;
     }
     _initialised = true;
 
@@ -141,6 +176,8 @@ class vulkan_layer final : public Ilayer {
         .descriptor_sets       = &_descriptor_sets,
     };
     _console->info("Vulkan was successfully initialised");
+
+    return true;
   }
 
   void update(double dt) noexcept final {
@@ -162,7 +199,11 @@ class vulkan_layer final : public Ilayer {
     }
   }
 
-  void cleanup() noexcept final { _device.waitIdle(); }
+  void cleanup() noexcept final {
+    if (*_device) {
+      _device.waitIdle();
+    }
+  }
 
   static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
       vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -188,36 +229,32 @@ class vulkan_layer final : public Ilayer {
   }
 
  private:
-  [[nodiscard]] bool check_number_of_messages(std::string_view message) {
-    uint64_t message_hash           = std::hash<std::string_view>{}(message);
-    auto number_of_message_instance = _debug_message_instances.find(message_hash);
-    if (number_of_message_instance != _debug_message_instances.end()) {
-      if (number_of_message_instance->second > vulkan_config::max_number_of_exception_error) {
-        return false;
-      } else {
-        if (number_of_message_instance->second == vulkan_config::max_number_of_exception_error) {
-          _console->warn(
-              "Exception has been shown {}, this is the last time it is printed:  ",
-              vulkan_config::max_number_of_exception_error
-          );
-        }
-        number_of_message_instance->second++;
-      }
-    } else {
-      _debug_message_instances.emplace(message_hash, 0);
-    }
-    return true;
-  }
+  // [[nodiscard]] bool check_number_of_messages(std::string_view message) {
+  //   uint64_t message_hash           = std::hash<std::string_view>{}(message);
+  //   auto number_of_message_instance = _debug_message_instances.find(message_hash);
+  //   if (number_of_message_instance != _debug_message_instances.end()) {
+  //     if (number_of_message_instance->second > vulkan_config::max_number_of_exception_error) {
+  //       return false;
+  //     } else {
+  //       if (number_of_message_instance->second == vulkan_config::max_number_of_exception_error) {
+  //         _console->warn(
+  //             "Exception has been shown {}, this is the last time it is printed:  ",
+  //             vulkan_config::max_number_of_exception_error
+  //         );
+  //       }
+  //       number_of_message_instance->second++;
+  //     }
+  //   } else {
+  //     _debug_message_instances.emplace(message_hash, 0);
+  //   }
+  //   return true;
+  // }
 
   void handle_exception(const std::string& context) noexcept {
     try {
       throw;
     } catch (const std::exception& e) {
-      uint64_t message_hash           = std::hash<std::string_view>{}(e.what());
-      auto number_of_message_instance = _debug_message_instances.find(message_hash);
-      if (!check_number_of_messages(e.what())) {
-        _console->error("Exception during Vulkan {} : {}", context, e.what());
-      }
+      _console->error("Exception during Vulkan {} : {}", context, e.what());
     } catch (...) {
       _console->error("Unknown error during Vulkan {}", context);
     }
@@ -246,13 +283,39 @@ class vulkan_layer final : public Ilayer {
       extensions.push_back(vk::EXTDebugUtilsExtensionName);
     }
 
+    auto extensions_properties = _context.enumerateInstanceExtensionProperties();
+    for (const auto* extension : extensions) {
+      if (std::ranges::none_of(
+              extensions_properties, [extension](vk::ExtensionProperties extension_property) {
+                return std::strcmp(extension_property.extensionName, extension) == 0;
+              }
+          )) {
+        throw std::runtime_error(
+            fmt::format("Requested extension '{}' is not supported, exiting", extension)
+        );
+      }
+    }
+
     // SELECTING LAYERS
     std::vector<const char*> layers;
     if (vulkan_config::enable_validation) {
       layers = vulkan_config::requested_layers;
     }
 
-    _console->warn("TO DO: check that requested extensions and layers are supported");
+    auto layer_properties = _context.enumerateInstanceLayerProperties();
+    size_t enabled_layers = layers.size();
+    for (int i = 0; i < enabled_layers;) {
+      const auto* layer = layers[i];
+      if (std::ranges::none_of(layer_properties, [layer](vk::LayerProperties layer_property) {
+            return std::strcmp(layer_property.layerName, layer) == 0;
+          })) {
+        _console->error("Requested layer '{}' is not supported, disabling it", layer);
+        layers.erase(layers.begin() + i);
+        enabled_layers--;
+      } else {
+        i++;
+      }
+    }
 
     // CREATING INSTANCE
     vk::InstanceCreateInfo instance_info{
@@ -305,13 +368,29 @@ class vulkan_layer final : public Ilayer {
     if (available.size() == 0) {
       throw std::runtime_error("No physical device found");
     }
-    if (available.size() > 1) {
-      _console->info("Multiple physical devices available, picking the first discrete one");
+    std::vector<vk::raii::PhysicalDevice> suitable;
+    for (const auto& physical_device : available) {
+      if (is_device_suitable(physical_device)) {
+        suitable.push_back(physical_device);
+      }
+    }
+    if (suitable.size() == 0) {
+      throw std::runtime_error(
+          "No physical device found is suitable (might be because it doesn't support required "
+          "vulkan api version, has no graphics queue or extensions such as 'swapchain KHR' are not "
+          "available), exiting"
+      );
+    }
+    if (suitable.size() > 1) {
+      _console->info(
+          "Multiple suitable physical devices available, picking the first one, discrete one in "
+          "priority"
+      );
       _console->warn("TO DO: improve physical device selection");
     }
 
     // SELECTING ONE BASE ON ITS PROPERTIES
-    for (const auto& physical_device : available) {
+    for (const auto& physical_device : suitable) {
       if (physical_device.getProperties2().properties.deviceType
           == vk::PhysicalDeviceType::eDiscreteGpu) {
         _physical_device = physical_device;
@@ -319,7 +398,7 @@ class vulkan_layer final : public Ilayer {
       }
     }
     if (!*_physical_device) {
-      _physical_device = available.front();
+      _physical_device = suitable.front();
     }
 
     auto device_properties = _physical_device.getProperties2().properties;
@@ -329,7 +408,53 @@ class vulkan_layer final : public Ilayer {
         vk::to_string(device_properties.deviceType)
     );
 
-    _console->warn("TO DO: check that all extensions are supported by the physical device");
+    auto features = _physical_device.template getFeatures2<
+        vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceVulkan12Features,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+
+    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy) {
+      throw std::runtime_error("Selected physical device doesn't support 'anisotropy', exiting");
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'shader draw parameters', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan12Features>().runtimeDescriptorArray) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'runtime descriptor array', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'dynamic rendering', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'synchronization 2', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>()
+             .extendedDynamicState) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'extended dynamic state', exiting"
+      );
+    }
+
+    if (device_properties.limits.maxDescriptorSetSamplers < vulkan_config::max_number_of_textures) {
+      throw std::runtime_error(
+          fmt::format(
+              "Selected physical device supports {} per stage descriptor samplers but reserved {} "
+              "texture slots, exiting",
+              device_properties.limits.maxDescriptorSetSamplers,
+              vulkan_config::max_number_of_textures
+          )
+      );
+    }
   }
 
   void create_logical_device() {
@@ -490,7 +615,7 @@ class vulkan_layer final : public Ilayer {
 
     vk::DescriptorSetLayoutCreateInfo layout_info{
         // .pNext        = &flags_info,
-        // .flags        = vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool,
+        .flags        = vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool,
         .bindingCount = static_cast<uint32_t>(layout_bindings.size()),
         .pBindings    = layout_bindings.data()
     };
@@ -689,8 +814,8 @@ class vulkan_layer final : public Ilayer {
         .descriptorCount = vulkan_config::frames_in_flight * vulkan_config::max_number_of_textures
     }};
     vk::DescriptorPoolCreateInfo pool_info{
-        .flags         = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-        //  | vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+        .flags         = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet
+                         | vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
         .maxSets       = vulkan_config::frames_in_flight,
         .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
         .pPoolSizes    = pool_sizes.data()
@@ -924,8 +1049,6 @@ class vulkan_layer final : public Ilayer {
   static inline bool _instance_running           = false;
   static inline vega_console _console            = console::create("Vulkan");
   static inline vega_console _validation_console = console::create("VulkanValidation");
-
-  std::unordered_map<uint64_t, uint8_t> _debug_message_instances;
 
   bool _initialised = false;
   vk::raii::Context _context;

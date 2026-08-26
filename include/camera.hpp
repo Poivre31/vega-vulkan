@@ -7,11 +7,13 @@ class camera_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
 
-  void init() noexcept final {
+  bool init() noexcept final {
     _cameras.emplace_back(45.F, glm::vec3{0.F, 0.F, 0.F}, glm::vec3{1.F, 0.F, 0.F});
     _active_camera = &_cameras[0];  // NOLINT
 
     get_app_context()->active_camera = _active_camera;
+
+    return true;
   }
   void update(double dt) noexcept final {
     const bool* key_states = SDL_GetKeyboardState(nullptr);

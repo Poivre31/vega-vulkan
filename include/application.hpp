@@ -43,8 +43,20 @@ class application {
 
   void run() noexcept {
     timer::create(_name);
+    int last_initialised_layer = 0;
+    bool initialisation_failed = false;
     for (auto& layer : _layers) {
-      layer->init();
+      if (!layer->init()) {
+        initialisation_failed = true;
+        break;
+      }
+      last_initialised_layer++;
+    }
+    if (initialisation_failed) {
+      for (int i = last_initialised_layer; i >= 0; i--) {
+        _layers[i]->cleanup();
+      }
+      return;
     }
 
     _context.running = true;
@@ -89,9 +101,11 @@ class application {
       double fixed_dt = _context.time - _context.last_fixed_update_time;
       if (fixed_dt >= application_config::fixed_time_step) {
         for (auto& layer : _layers) {
-          layer->fixed_update(fixed_dt);
+          layer->fixed_update(application_config::fixed_time_step);
         }
         _context.last_fixed_update_time = _context.time;
+        _context.fixed_frame++;
+        _context.fixed_time = application_config::fixed_time_step * _context.fixed_frame;
       }
 
       _context.frame++;

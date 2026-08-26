@@ -39,6 +39,8 @@ target_compile_definitions(VegaVulkan PRIVATE
     VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 )
 
+target_compile_options(VegaVulkan PRIVATE -march=x86-64 -mtune=generic)
+
 target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics.hpp")
 
 target_link_libraries(VegaVulkan PRIVATE

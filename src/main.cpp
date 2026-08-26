@@ -1,10 +1,11 @@
 #include <console/console.hpp>
 #include "application.hpp"
+#include <iostream>
 
 class fps_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
-  void init() noexcept final {}
+  bool init() noexcept final { return true; }
   void update(double dt) noexcept final {}
   void fixed_update(double dt) noexcept final {
     _console->info(
