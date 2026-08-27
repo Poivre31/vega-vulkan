@@ -19,3 +19,20 @@
 [submodule "vendor/tinyobj"]
 	path = vendor/tinyobj
 	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "vendor/Vulkan-Hpp/external/glfw"]
+    path = vendor/Vulkan-Hpp/external/glfw
+    url = ...
+    ignore = all
+
+[submodule "vendor/Vulkan-Hpp/external/glm"]
+    path = vendor/Vulkan-Hpp/external/glm
+    url = ...
+    ignore = all
+
+[submodule "vendor/Vulkan-Hpp/external/glslang"]
+    path = vendor/Vulkan-Hpp/external/glslang
+    url = ...
+    ignore = all
+[submodule "vendor/vulkan-headers"]
+	path = vendor/vulkan-headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers

@@ -34,18 +34,12 @@ target_include_directories(VegaVulkan PRIVATE "include")
 
 add_subdirectory(vendor)
 
-find_package(Vulkan 1.3 REQUIRED)
-target_compile_definitions(VegaVulkan PRIVATE
-    VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
-)
-
 target_compile_options(VegaVulkan PRIVATE -march=x86-64 -mtune=generic)
 
 target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics.hpp")
 
 target_link_libraries(VegaVulkan PRIVATE
     vendor
-    Vulkan::Vulkan
 )
 
 add_custom_target(CopyShaders

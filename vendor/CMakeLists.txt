@@ -6,8 +6,18 @@ add_subdirectory(vega/console)
 add_subdirectory(vega/timer)
 # END VEGA
 
+# VULKAN
+# FOR LINUX : libvulkan-dev vulkan-validationlayers mesa-vulkan-drivers vulkan-tools
+find_library(VULKAN_LIB vulkan REQUIRED)
+target_compile_definitions(vendor INTERFACE
+    VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+)
+target_include_directories(vendor INTERFACE vulkan-headers/include)  # your vendored headers, unchanged
+target_link_libraries(vendor INTERFACE ${VULKAN_LIB})
+# END VULKAN
+
 # VMA
-add_subdirectory(vma-hpp/include)
+add_subdirectory(vma-hpp)
 target_include_directories(vendor INTERFACE vma-hpp/VulkanMemoryAllocator/include)
 target_link_libraries(vendor INTERFACE VulkanMemoryAllocator-Hpp::VulkanMemoryAllocator-Hpp)
 target_compile_definitions(vendor INTERFACE VMA_IMPLEMENTATION )
