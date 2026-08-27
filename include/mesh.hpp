@@ -9,12 +9,13 @@ struct vertex_3D {
   glm::vec3 position{};
   glm::vec3 normal{};
   glm::vec2 uv{};
+  uint32_t material_id{};
 
   static vk::VertexInputBindingDescription binding_description() {
     return {.binding = 0, .stride = sizeof(vertex_3D), .inputRate = vk::VertexInputRate::eVertex};
   }
 
-  static std::array<vk::VertexInputAttributeDescription, 3> attribute_description() {
+  static std::vector<vk::VertexInputAttributeDescription> attribute_description() {
     return {
         vk::VertexInputAttributeDescription{
             .location = 0,
@@ -33,6 +34,12 @@ struct vertex_3D {
             .binding  = 0,
             .format   = vk::Format::eR32G32Sfloat,
             .offset   = offsetof(vertex_3D, uv)
+        },
+        vk::VertexInputAttributeDescription{
+            .location = 3,
+            .binding  = 0,
+            .format   = vk::Format::eR32Uint,
+            .offset   = offsetof(vertex_3D, material_id)
         }
     };
   }

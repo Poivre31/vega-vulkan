@@ -11,8 +11,11 @@ class assets_layer final : public Ilayer {
   using Ilayer::Ilayer;
   bool init() noexcept final {
     try {
-      vulkan_context context = get_app_context()->vulkan_context;
-      _meshes.emplace_back(load_object("resources/models/viking_room.obj"));
+      vulkan_context context       = get_app_context()->vulkan_context;
+      auto [sponza_mesh, textures] = load_object_and_materials(
+          "resources/models/sponza/", "sponza.obj", 1. / 100
+      );
+      _meshes.emplace_back(sponza_mesh);
       // _meshes.emplace_back(create_cube({1.F, 0.F, 0.F}, 0.3F));
       for (auto& mesh : _meshes) {
         mesh.create_vertex_buffer(context);
@@ -39,16 +42,15 @@ class assets_layer final : public Ilayer {
 
       _samplers.emplace_back(*context.device, sampler_info);
 
-      stb_image beer;
-      std::vector<stb_image> cpu_images;
-      beer.load("resources/textures/beer.png");
-      cpu_images.emplace_back(std::move(beer));
-      beer.load("resources/textures/beer2.png");
-      cpu_images.emplace_back(std::move(beer));
-      beer.load("resources/textures/statue.jpg");
-      cpu_images.emplace_back(std::move(beer));
-      beer.load("resources/textures/viking_room.png");
-      cpu_images.emplace_back(std::move(beer));
+      std::vector<stb_image> cpu_images = std::move(textures);
+      // beer.load("resources/textures/beer.png");
+      // cpu_images.emplace_back(std::move(beer));
+      // beer.load("resources/textures/beer2.png");
+      // cpu_images.emplace_back(std::move(beer));
+      // beer.load("resources/textures/statue.jpg");
+      // cpu_images.emplace_back(std::move(beer));
+      // beer.load("resources/textures/viking_room.png");
+      // cpu_images.emplace_back(std::move(beer));
 
       std::vector<vk::DescriptorImageInfo> image_descriptors;
       for (auto& image : cpu_images) {

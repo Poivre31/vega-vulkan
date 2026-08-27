@@ -6,6 +6,7 @@
 #include <memory>
 #include <console/console.hpp>
 #include <timer/timer.hpp>
+#include <utility>
 
 enum class stb_channels : uint8_t { RGB = STBI_rgb, RGBA = STBI_rgb_alpha };
 
@@ -28,6 +29,32 @@ constexpr std::array<stbi_uc, fallback_image_channels> fallback_image_color_2 =
 class stb_image {
  public:
   stb_image() = default;
+  stb_image(
+      const std::string& image_path,
+      stb_channels target_channels = stb_channels::RGBA,
+      bool silence                 = false
+  ) {
+    load(image_path, target_channels, silence);
+  }
+  stb_image(glm::vec4 color, uint32_t width, uint32_t height) {
+    _data = stb_image_ptr(
+        new stbi_uc[4](
+            stbi_uc(color.r * 255),
+            stbi_uc(color.g * 255),
+            stbi_uc(color.b * 255),
+            stbi_uc(color.a * 255)
+        ),
+        &stbi_image_free
+    );
+    if (!_data) {
+      console::get(consoles::assets)->error("Single color texture creation failed");
+      return;
+    }
+    _tex_width    = 1;
+    _tex_height   = 1;
+    _channels     = 4;
+    _image_loaded = true;
+  }
 
   /**
    * @brief Tries to load image using stb image loader. Loads a fallback texture on failure.
@@ -37,7 +64,7 @@ class stb_image {
    *
    */
   void load(
-      std::string image_path,
+      const std::string& image_path,
       stb_channels target_channels = stb_channels::RGBA,
       bool silence                 = false
   ) noexcept {
