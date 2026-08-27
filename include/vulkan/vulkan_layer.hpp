@@ -5,6 +5,7 @@
 #include <console/console.hpp>
 #include <SDL3/SDL_vulkan.h>
 #include "sdl.hpp"
+#include "vulkan/vulkan.hpp"
 #include "vulkan_context.hpp"
 #include <fstream>
 #include <ios>
@@ -250,7 +251,7 @@ class vulkan_layer final : public Ilayer {
   //   return true;
   // }
 
-  void handle_exception(const std::string& context) noexcept {
+  static void handle_exception(const std::string& context) noexcept {
     try {
       throw;
     } catch (const std::exception& e) {
@@ -423,6 +424,13 @@ class vulkan_layer final : public Ilayer {
           "Selected physical device doesn't support 'shader draw parameters', exiting"
       );
     }
+    if (!features.template get<vk::PhysicalDeviceVulkan12Features>()
+             .shaderSampledImageArrayNonUniformIndexing) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'sampled image array non uniform indexing', "
+          "exiting"
+      );
+    }
     if (!features.template get<vk::PhysicalDeviceVulkan12Features>().runtimeDescriptorArray) {
       throw std::runtime_error(
           "Selected physical device doesn't support 'runtime descriptor array', exiting"
@@ -468,7 +476,10 @@ class vulkan_layer final : public Ilayer {
         featureChain = {
             {.features = {.samplerAnisotropy = vk::True}},
             {.shaderDrawParameters = vk::True},
-            {.runtimeDescriptorArray = vk::True},
+            {
+                .shaderSampledImageArrayNonUniformIndexing = vk::True,
+                .runtimeDescriptorArray                    = vk::True,
+            },
             {
                 .synchronization2 = vk::True,
                 .dynamicRendering = vk::True,
@@ -1087,6 +1098,4 @@ class vulkan_layer final : public Ilayer {
   uint32_t _frame_index = 0;
   std::vector<vk::raii::Semaphore> _presentation_semaphores;
   std::vector<vk::raii::Fence> _draw_fences;
-
-  gpu_image image;
 };

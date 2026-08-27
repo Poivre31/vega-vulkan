@@ -2,7 +2,6 @@
 
 #include "layer.hpp"
 #include "mesh.hpp"
-#include "primitive_meshes.hpp"
 #include "object_loader.hpp"  // IWYU pragma: keep
 #include "image.hpp"
 

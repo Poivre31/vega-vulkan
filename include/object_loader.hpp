@@ -4,7 +4,6 @@
 #include "stb_image.hpp"
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
-#include <unordered_map>
 
 // class material_manager {
 //  public:
@@ -48,7 +47,7 @@ load_object(const std::string& model_path, float scale) {  // NOLINT
       }
       std::abort();
     }
-    if (!reader.Warning().empty()) {
+    if (!reader.Warning().empty() && vulkan_config::enable_validation) {  // TO DO: Separate config
       console::get(consoles::assets)
           ->warn("TinyObjReader warning when loading model: {:s}", reader.Warning());
     }
@@ -120,7 +119,6 @@ std::pair<std::vector<vertex_3D>, std::vector<stb_image>> load_object_and_materi
   std::vector<stb_image> images;
   images.reserve(materials.size());
   for (auto& material : materials) {
-    console::get(consoles::assets)->info("{}", material.diffuse_texname);
     if (!material.diffuse_texname.empty()) {
       images.emplace_back(model_directory + material.diffuse_texname);
     } else {
