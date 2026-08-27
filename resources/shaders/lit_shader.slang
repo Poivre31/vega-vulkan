@@ -17,14 +17,14 @@ struct VSInput {
   float3 position;
   float3 normal;
   float2 uv;
-  nointerpolation uint32_t material_id;
+  uint32_t material_id;
 };
 
 struct VertexOutput {
   float4 position : SV_Position;
   float3 normal;
   float2 uv;
-  uint32_t material_id;
+  nointerpolation uint32_t material_id;
 };
 
 uint randIntU(uint seed) {
@@ -73,7 +73,7 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
   float3 color    = intensity * light_color + (1 - intensity) * ambient_color;
 
   float3 albedo =
-      textures[NonUniformResourceIndex(inVert.material_id)].Sample(float2(1) - inVert.uv).rgb;
+      textures[NonUniformResourceIndex(inVert.material_id)].Sample(float2(inVert.uv.x,1-inVert.uv.y)).rgb;
 
   return float4(albedo * color, 1);
   // return float4(inVert.uv, 0.5 + 0.5 * sin(3.14 * push_constants.time / 2), 1);

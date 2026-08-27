@@ -6,7 +6,6 @@
 #include <memory>
 #include <console/console.hpp>
 #include <timer/timer.hpp>
-#include <utility>
 
 enum class stb_channels : uint8_t { RGB = STBI_rgb, RGBA = STBI_rgb_alpha };
 
@@ -47,13 +46,16 @@ class stb_image {
         &stbi_image_free
     );
     if (!_data) {
-      console::get(consoles::assets)->error("Single color texture creation failed");
+      console::get(consoles::assets)
+          ->error("Single color texture creation failed, loading fallback texture");
+      _use_fallback = true;
       return;
     }
     _tex_width    = 1;
     _tex_height   = 1;
     _channels     = 4;
     _image_loaded = true;
+    _use_fallback = false;
   }
 
   /**
@@ -88,6 +90,7 @@ class stb_image {
                   std::filesystem::current_path().string(),
                   std::filesystem::absolute("resources/textures/").string()
               );
+          _use_fallback = true;
           return;
         }
       }
@@ -107,11 +110,13 @@ class stb_image {
             ->error(
                 "Image '{:s}' exists but loading failed,  loading fallback texture", path.string()
             );
+        _use_fallback = true;
         return;
       }
       _data         = stb_image_ptr(image_data, stbi_image_free);
       _channels     = static_cast<int>(target_channels);
       _image_loaded = true;
+      _use_fallback = false;
       if (!silence) {
         console::get(consoles::assets)
             ->trace(
@@ -124,27 +129,33 @@ class stb_image {
     } catch (const std::filesystem::filesystem_error& e) {
       console::get(consoles::assets)
           ->error("Filesystem error loading image '{}': {}", image_path, e.what());
+      _use_fallback = true;
     } catch (const std::exception& e) {
       console::get(consoles::assets)
           ->error("Unexpected error loading image '{}': {}", image_path, e.what());
+      _use_fallback = true;
     }
   }
 
   /** @brief Unloads loaded image if there is one, otherwise output warning and do nothing.*/
   void unload() noexcept {
-    if (!_image_loaded) {
+    if (!_image_loaded && !_use_fallback) {
       console::get(consoles::assets)
           ->warn("Trying to unload image but no image has been loaded yet.\nDoing nothing");
     } else {
       _data.reset();
       _image_loaded = false;
+      _use_fallback = false;
     }
   }
 
   /** @brief Get the image memory pointer after image has been loaded, returns nullptr if it hasn't
    * been loaded */
   [[nodiscard]] stbi_uc* data() const noexcept {
-    if (!_image_loaded) {
+    if (_use_fallback) {
+      console::get(consoles::assets)->warn("Accessing a fallback texture's data");
+      return _fallback_image.data()->data();
+    } else if (!_image_loaded) {
       console::get(consoles::assets)
           ->error(
               "Accessing an image whose data hasn't been loaded yet, returning fallback texture"
@@ -176,6 +187,7 @@ class stb_image {
   int _tex_height{};
   int _channels{};
   bool _image_loaded = false;
+  bool _use_fallback = true;
 
   static inline std::array<
       std::array<stbi_uc, fallback_image_channels>,
