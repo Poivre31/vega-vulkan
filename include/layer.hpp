@@ -1,8 +1,10 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <cstdint>
 #include "camera_class.hpp"
 #include "mesh.hpp"
 #include "image.hpp"
+#include "vulkan/vulkan.hpp"
 
 struct resources_data {
   std::vector<mesh_3D>* meshes             = nullptr;
@@ -37,6 +39,8 @@ struct application_context {
   vulkan_context vulkan;
 
   resources_data resources;
+
+  std::vector<std::vector<uint32_t>> shader_modules;
 };
 
 bool is_context_valid(application_context& context) {

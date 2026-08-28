@@ -29,6 +29,8 @@ target_sources(VegaVulkan PRIVATE
     "include/image.hpp"
     "include/object_loader.hpp"
     include/global_config.hpp
+    include/slang_compiler.hpp
+    include/io.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 
@@ -39,7 +41,13 @@ target_compile_options(VegaVulkan PRIVATE -march=x86-64 -mtune=generic)
 target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics.hpp")
 
 target_link_libraries(VegaVulkan PRIVATE
-    vendor
+vendor
+)
+
+set_target_properties(VegaVulkan PROPERTIES
+    BUILD_RPATH "$ORIGIN"
+    INSTALL_RPATH "$ORIGIN"
+    BUILD_RPATH_USE_ORIGIN TRUE
 )
 
 add_custom_target(CopyShaders
