@@ -12,14 +12,20 @@ add_subdirectory(vega/timer)
 # VULKAN
 # FOR LINUX : install libvulkan-dev vulkan-validationlayers mesa-vulkan-drivers vulkan-tools
 if (UNIX)
-find_library(VULKAN_LIB vulkan REQUIRED)
-target_include_directories(vendor INTERFACE vulkan-headers/include)
-target_link_libraries(vendor INTERFACE ${VULKAN_LIB})
+    message(STATUS "Fetching vulkan headers...")
+    FetchContent_Declare(vulkan_headers
+        GIT_REPOSITORY https://github.com/KhronosGroup/vulkan-headers
+        GIT_TAG e3b1eec08173d6b825cd3ac88c885a63b621504a # 1.4.357
+    )
+    FetchContent_MakeAvailable(vulkan_headers)
+    target_include_directories(vendor INTERFACE ${vulkan_headers_SOURCE_DIR}/include)
+    find_library(VULKAN_LIB vulkan REQUIRED)
+    target_link_libraries(vendor INTERFACE ${VULKAN_LIB})
 
 # FOR WINDOWS : install lunar SDK
 elseif(WIN32)
-find_package(Vulkan 1.3 REQUIRED)
-target_link_libraries(vendor INTERFACE Vulkan::Vulkan)
+    find_package(Vulkan 1.3 REQUIRED)
+    target_link_libraries(vendor INTERFACE Vulkan::Vulkan)
 
 endif()
 
@@ -37,6 +43,7 @@ elseif(UNIX)
     set(SLANG_URL "https://github.com/shader-slang/slang/releases/download/v${SLANG_VERSION}/slang-${SLANG_VERSION}-linux-x86_64.zip")
 endif()
 
+message(STATUS "Fetching slang binaries...")
 FetchContent_Declare(slang_bin URL ${SLANG_URL})
 FetchContent_MakeAvailable(slang_bin)
 

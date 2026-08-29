@@ -8,7 +8,6 @@
 #include "console/console.hpp"
 #include "layer.hpp"
 #include "timer/timer.hpp"
-#include "vulkan/vulkan.hpp"
 #include <io.hpp>
 
 // const char* const simple_shader =

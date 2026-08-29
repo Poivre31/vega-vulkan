@@ -10,9 +10,6 @@
 [submodule "vendor/vma-hpp"]
 	path = vendor/vma-hpp
 	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp
-[submodule "vendor/vulkan-headers"]
-	path = vendor/vulkan-headers
-	url = https://github.com/KhronosGroup/Vulkan-Headers
 [submodule "vendor/tinyobj"]
 	path = vendor/tinyobj
 	url = https://github.com/tinyobjloader/tinyobjloader
