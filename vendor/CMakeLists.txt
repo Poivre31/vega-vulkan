@@ -32,7 +32,7 @@ target_compile_definitions(vendor INTERFACE
 set(SLANG_VERSION "2026.16")
 
 if(WIN32)
-    message(IMPLEMENT WINDOWS)
+    set(SLANG_URL "https://github.com/shader-slang/slang/releases/download/v${SLANG_VERSION}/slang-${SLANG_VERSION}-windows-x86_64.zip")
 elseif(UNIX)
     set(SLANG_URL "https://github.com/shader-slang/slang/releases/download/v${SLANG_VERSION}/slang-${SLANG_VERSION}-linux-x86_64.zip")
 endif()
@@ -40,7 +40,10 @@ endif()
 FetchContent_Declare(slang_bin URL ${SLANG_URL})
 FetchContent_MakeAvailable(slang_bin)
 
-if(UNIX)
+if(WIN32)
+    set(SLANG_SHARED_LIB "${slang_bin_SOURCE_DIR}/bin/slang-compiler.dll")
+    set(SLANG_IMPORT_LIB "${slang_bin_SOURCE_DIR}/lib/slang-compiler.lib")
+elseif(UNIX)
     set(SLANG_SHARED_LIB "${slang_bin_SOURCE_DIR}/lib/libslang-compiler.so.0.${SLANG_VERSION}")
 endif()
 
@@ -49,6 +52,10 @@ set_target_properties(slang PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${slang_bin_SOURCE_DIR}/include"
     IMPORTED_LOCATION "${SLANG_SHARED_LIB}"
 )
+
+if(WIN32)
+    set_target_properties(slang PROPERTIES IMPORTED_IMPLIB "${SLANG_IMPORT_LIB}" )
+endif()
 
 add_custom_target(CopySlangLib
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SLANG_SHARED_LIB} ${CMAKE_BINARY_DIR}
@@ -98,45 +105,36 @@ target_compile_definitions(vendor INTERFACE
 # END OBJ
 
 # SDL3
-# cmake -B build -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=0 -DSDL_STATIC=1 -DSDL_TEST=0 -DSDL_GPU=0 -DSDL_RENDER=0 -DSDL_CAMERA=0 -DSDL_JOYSTICK=0 -DSDL_HAPTIC=0 -DSDL_POWER=0 -DSDL_SENSOR=0
-# cmake --build build
-# set(SDL_SHARED OFF  CACHE BOOL "" FORCE)
-# set(SDL_STATIC ON CACHE BOOL "" FORCE)
-# set(SDL_TEST   OFF CACHE BOOL "" FORCE)
+# cmake -B build -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=0 -DSDL_STATIC=1 -DSDL_TESTS=0 -DSDL_GPU=0 -DSDL_RENDER=0 -DSDL_CAMERA=0 -DSDL_JOYSTICK=0 -DSDL_HAPTIC=0 -DSDL_POWER=0 -DSDL_SENSOR=0 -DSDL_AVX=0 -DSDL_AVX2=0 -DSDL_AVX512F=0 -DSDL_OPENGL=0 -DSDL_OPENGLES=0 -DSDL_DIRECTX=0 -G Ninja
+if(WIN32)
+    add_library(sdl SHARED IMPORTED)
+    set(SDL_SHARED_LIB "${CMAKE_SOURCE_DIR}/vendor/SDL3-bin/bin/SDL3.dll")
+    set_target_properties(sdl PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/vendor/SDL3-bin/include"
+        IMPORTED_LOCATION "${SDL_SHARED_LIB}"
+        IMPORTED_IMPLIB "${CMAKE_SOURCE_DIR}/vendor/SDL3-bin/lib/libSDL3.dll.a"
+    )
 
-# set(SDL_JOYSTICK  OFF CACHE BOOL "" FORCE)
-# set(SDL_HAPTIC  OFF CACHE BOOL "" FORCE)
-# set(SDL_POWER  OFF CACHE BOOL "" FORCE)
-# set(SDL_SENSOR  OFF CACHE BOOL "" FORCE)
-# set(SDL_CAMERA   OFF CACHE BOOL "" FORCE)
-# set(SDL_AUDIO   OFF CACHE BOOL "" FORCE)
+    add_custom_target(CopySdlLib
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${SDL_SHARED_LIB}" ${CMAKE_BINARY_DIR}
+    )
+    install(PROGRAMS "${SDL_SHARED_LIB}"
+        DESTINATION .
+    )
+    add_dependencies(vendor CopySdlLib)
 
-# set(SDL_GPU  OFF CACHE BOOL "" FORCE)
-# set(SDL_RENDER   OFF CACHE BOOL "" FORCE)
-
-# set(SDL_OPENGL   OFF CACHE BOOL "" FORCE)
-# set(SDL_OPENGLES OFF CACHE BOOL "" FORCE)
-# set(SDL_METAL     OFF CACHE BOOL "" FORCE)
-# set(SDL_DIRECT3D  OFF CACHE BOOL "" FORCE)
-# set(SDL_WAYLAND OFF CACHE BOOL "" FORCE)
-
-# set(SDL_VULKAN ON CACHE BOOL "" FORCE)
-
-# add_subdirectory(SDL3)
-add_library(sdl STATIC IMPORTED)
-if(UNIX)
+elseif(UNIX)
+    add_library(sdl STATIC IMPORTED)
     set_target_properties(sdl PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/vendor/SDL3-bin/include"
         IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/vendor/SDL3-bin/lib/libSDL3.a"
     )
 endif()
-
 # END SDL3
 
 target_link_libraries(vendor INTERFACE
-    # SDL3::SDL3
-    slang
     sdl
+    slang
     VulkanMemoryAllocator-Hpp::VulkanMemoryAllocator-Hpp
     glm::glm
     Console
