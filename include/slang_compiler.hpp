@@ -22,7 +22,34 @@
 class slang_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
-  bool init() noexcept final {
+  bool init() noexcept final { return load_shaders(); }
+  void update(double dt) noexcept final {
+    const bool* key_states = SDL_GetKeyboardState(nullptr);
+
+    if (get_app_context()->recompile_shaders) {
+      _console->info("Recompiling shaders...");
+      if (!load_shaders()) {
+        _console->error("Shader recompilation failed, keeping old pipeline");
+        get_app_context()->vulkan.recreate_graphics_pipeline = false;
+      } else {
+        get_app_context()->vulkan.recreate_graphics_pipeline = true;
+      }
+      get_app_context()->recompile_shaders = false;
+    }
+  }
+  void cleanup() noexcept final {}
+
+ private:
+  static void diagnose_if_needed(slang::IBlob* diagnostics_blob) {
+    if (diagnostics_blob != nullptr) {
+      _console->error(
+          "Slang diagnositcs error: {}",
+          reinterpret_cast<const char*>(diagnostics_blob->getBufferPointer())
+      );
+    }
+  }
+
+  bool load_shaders() {
     // CREATE SESSION
     Slang::ComPtr<slang::IGlobalSession> global_session;
     slang::createGlobalSession(global_session.writeRef());
@@ -161,6 +188,7 @@ class slang_layer final : public Ilayer {
       }
     }
 
+    get_app_context()->shader_modules.clear();
     get_app_context()->shader_modules.emplace_back(
         reinterpret_cast<const uint32_t*>(spirv_code->getBufferPointer()),
         reinterpret_cast<const uint32_t*>(spirv_code->getBufferPointer())
@@ -168,18 +196,6 @@ class slang_layer final : public Ilayer {
     );
 
     return true;
-  }
-  void update(double dt) noexcept final {}
-  void cleanup() noexcept final {}
-
- private:
-  static void diagnose_if_needed(slang::IBlob* diagnostics_blob) {
-    if (diagnostics_blob != nullptr) {
-      _console->error(
-          "Slang diagnositcs error: {}",
-          reinterpret_cast<const char*>(diagnostics_blob->getBufferPointer())
-      );
-    }
   }
 
   static inline vega_console _console = console::create("Slang");

@@ -166,6 +166,10 @@ class vulkan_layer final : public Ilayer {
       return;
     }
     try {
+      if (get_app_context()->vulkan.recreate_graphics_pipeline) {
+        recreate_graphics_pipeline();
+        get_app_context()->vulkan.recreate_graphics_pipeline = false;
+      }
       if (get_app_context()->active_camera) {
         _push_constants.view_projection_matrix =
             get_app_context()->active_camera->get_view_projection_matrix();
@@ -745,6 +749,12 @@ class vulkan_layer final : public Ilayer {
     _graphics_pipeline = vk::raii::Pipeline(
         _device, nullptr, pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
     );
+  }
+
+  void recreate_graphics_pipeline() {
+    _device.waitIdle();
+    _graphics_pipeline = nullptr;
+    create_graphics_pipeline();
   }
 
   void create_command_pool() {
