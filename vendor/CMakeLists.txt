@@ -1,5 +1,5 @@
 set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/.cache/_deps")
-include (FetchContent)
+include(FetchContent)
 
 add_library(vendor INTERFACE)
 
@@ -11,7 +11,7 @@ add_subdirectory(vega/timer)
 
 # VULKAN
 # FOR LINUX : install libvulkan-dev vulkan-validationlayers mesa-vulkan-drivers vulkan-tools
-if (UNIX)
+if(UNIX)
     message(STATUS "Fetching vulkan headers...")
     FetchContent_Declare(vulkan_headers
         GIT_REPOSITORY https://github.com/KhronosGroup/vulkan-headers
@@ -22,7 +22,7 @@ if (UNIX)
     find_library(VULKAN_LIB vulkan REQUIRED)
     target_link_libraries(vendor INTERFACE ${VULKAN_LIB})
 
-# FOR WINDOWS : install lunar SDK
+    # FOR WINDOWS : install lunar SDK
 elseif(WIN32)
     find_package(Vulkan 1.3 REQUIRED)
     target_link_libraries(vendor INTERFACE Vulkan::Vulkan)
@@ -31,6 +31,7 @@ endif()
 
 target_compile_definitions(vendor INTERFACE
     VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+    VULKAN_HPP_HANDLE_ERROR_OUT_OF_DATE_AS_SUCCESS
 )
 # END VULKAN
 
@@ -61,7 +62,7 @@ set_target_properties(slang PROPERTIES
 )
 
 if(WIN32)
-    set_target_properties(slang PROPERTIES IMPORTED_IMPLIB "${SLANG_IMPORT_LIB}" )
+    set_target_properties(slang PROPERTIES IMPORTED_IMPLIB "${SLANG_IMPORT_LIB}")
 endif()
 
 add_custom_target(CopySlangLib
@@ -79,7 +80,7 @@ install(PROGRAMS ${SLANG_SHARED_LIB}
 add_subdirectory(vma-hpp)
 target_include_directories(vendor INTERFACE vma-hpp/VulkanMemoryAllocator/include)
 
-target_compile_definitions(vendor INTERFACE VMA_IMPLEMENTATION )
+target_compile_definitions(vendor INTERFACE VMA_IMPLEMENTATION)
 # END VMA
 
 # GLM
@@ -91,13 +92,13 @@ target_compile_definitions(vendor INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 # STB
 target_include_directories(vendor INTERFACE stb-image)
 
-target_compile_definitions(vendor INTERFACE STB_IMAGE_IMPLEMENTATION )
+target_compile_definitions(vendor INTERFACE STB_IMAGE_IMPLEMENTATION)
 # END STB
 
 # GLTF
 target_include_directories(vendor INTERFACE tinygltf)
 
-target_compile_definitions(vendor INTERFACE TINYGLTF_IMPLEMENTATION )
+target_compile_definitions(vendor INTERFACE TINYGLTF_IMPLEMENTATION)
 # END GLTF
 
 # OBJ

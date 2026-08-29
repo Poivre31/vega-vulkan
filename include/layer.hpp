@@ -41,7 +41,8 @@ struct application_context {
   resources_data resources;
 
   std::vector<std::vector<uint32_t>> shader_modules;
-  bool recompile_shaders = false;
+  bool recompile_shaders    = false;
+  bool frame_buffer_resized = false;
 };
 
 bool is_context_valid(application_context& context) {

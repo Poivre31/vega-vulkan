@@ -72,10 +72,10 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
   float intensity = clamp(dot(inVert.normal, -light_dir) / dot(light_dir, light_dir), 0, 1);
   float3 color    = intensity * light_color + (1 - intensity) * ambient_color;
 
-  float3 albedo =
-      textures[NonUniformResourceIndex(inVert.material_id)].Sample(float2(inVert.uv.x,1-inVert.uv.y)).rgb;
+  float3 albedo = textures[NonUniformResourceIndex(inVert.material_id)]
+                      .Sample(float2(inVert.uv.x, 1 - inVert.uv.y))
+                      .rgb;
 
-  return float4(1);
-  return float4(albedo * color, 1)*float4(1,0.3,0.4,0.8);
+  return float4(albedo * color, 1);
   // return float4(inVert.uv, 0.5 + 0.5 * sin(3.14 * push_constants.time / 2), 1);
 }

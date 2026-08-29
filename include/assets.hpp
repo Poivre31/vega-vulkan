@@ -4,6 +4,7 @@
 #include "mesh.hpp"
 #include "object_loader.hpp"  // IWYU pragma: keep
 #include "image.hpp"
+#include "stb_image.hpp"
 
 class assets_layer final : public Ilayer {
  public:
@@ -11,8 +12,11 @@ class assets_layer final : public Ilayer {
   bool init() noexcept final {
     try {
       vulkan_context context       = get_app_context()->vulkan;
+      // auto [sponza_mesh, textures] = load_object_and_materials(
+      //     "resources/models/sponza/", "sponza.obj", 1. / 100
+      // );
       auto [sponza_mesh, textures] = load_object_and_materials(
-          "resources/models/sponza/", "sponza.obj", 1. / 100
+          "resources/models/tiger/", "Tiger_I.obj", 1.
       );
       _meshes.emplace_back(sponza_mesh);
       // _meshes.emplace_back(create_cube({1.F, 0.F, 0.F}, 0.3F));

@@ -181,6 +181,7 @@ class vulkan_layer final : public Ilayer {
       draw_frame();
     } catch (...) {
       handle_exception("update");
+      std::abort();
     }
   }
 
@@ -989,6 +990,10 @@ class vulkan_layer final : public Ilayer {
   }
 
   void draw_frame() {
+    if (get_app_context()->frame_buffer_resized) {
+      _console->info("Frame buffer resized");
+    }
+
     auto fence_result = _device.waitForFences(
         *_draw_fences.at(_frame_index), vk::True, std::numeric_limits<uint64_t>::max()
     );
@@ -1002,12 +1007,13 @@ class vulkan_layer final : public Ilayer {
         nullptr
     );  // Timeout, semaphore, fence
 
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+    if (result == vk::Result::eErrorOutOfDateKHR) {
       vk::SemaphoreCreateInfo semaphore_info{};
       _presentation_semaphores.at(_frame_index) = vk::raii::Semaphore(_device, semaphore_info);
       recreate_swapchain();
+      get_app_context()->frame_buffer_resized = false;
       return;
-    } else if (result != vk::Result::eSuccess) {
+    } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
       throw std::runtime_error("Swap chain image acquisition failed: " + vk::to_string(result));
     }
 
@@ -1043,9 +1049,10 @@ class vulkan_layer final : public Ilayer {
 
     result = _graphics_queue.presentKHR(presentInfo);
 
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR
+        || get_app_context()->frame_buffer_resized) {
       recreate_swapchain();
-      return;
+      get_app_context()->frame_buffer_resized = false;
     } else if (result != vk::Result::eSuccess) {
       throw std::runtime_error("Graphics queue presentation failed: " + vk::to_string(result));
     }

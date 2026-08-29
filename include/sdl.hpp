@@ -74,6 +74,8 @@ class sdl_layer final : public Ilayer {
         case (SDL_EVENT_WINDOW_RESIZED):
           get_app_context()->width  = event.window.data1;
           get_app_context()->height = event.window.data2;
+
+          get_app_context()->frame_buffer_resized = true;
           break;
 
         default:
