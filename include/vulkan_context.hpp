@@ -9,6 +9,8 @@ struct vulkan_context {
   vk::raii::CommandPool* command_pool       = nullptr;
 
   vk::raii::DescriptorSets* descriptor_sets = nullptr;
+
+  bool recreate_graphics_pipeline = false;
 };
 
 namespace vulkan_config {

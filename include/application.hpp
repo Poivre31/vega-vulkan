@@ -3,6 +3,7 @@
 #include "sdl.hpp"
 #include "camera.hpp"
 #include "vulkan/vulkan_layer.hpp"
+#include "slang_compiler.hpp"
 #include "assets.hpp"
 #include <console/console.hpp>
 #include <concepts>
@@ -26,6 +27,7 @@ class application {
     _console = console::create(_name);
     push_layer<sdl_layer>();
     push_layer<camera_layer>();
+    push_layer<slang_layer>();
     push_layer<vulkan_layer>();
     push_layer<assets_layer>();
     (push_layer<layers>(), ...);

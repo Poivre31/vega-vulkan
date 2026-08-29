@@ -75,6 +75,7 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
   float3 albedo =
       textures[NonUniformResourceIndex(inVert.material_id)].Sample(float2(inVert.uv.x,1-inVert.uv.y)).rgb;
 
-  return float4(albedo * color, 1);
+  return float4(1);
+  return float4(albedo * color, 1)*float4(1,0.3,0.4,0.8);
   // return float4(inVert.uv, 0.5 + 0.5 * sin(3.14 * push_constants.time / 2), 1);
 }

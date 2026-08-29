@@ -42,6 +42,7 @@ constexpr double time_unit_factor(time_unit unit) noexcept {
     case time_unit::nanosecond:
       return 1e0;
   }
+  return 0.;
 }
 
 /** Returns the symbol associated with unit @param unit (ms, µs...) */
@@ -56,6 +57,7 @@ constexpr std::string time_unit_text(time_unit unit) noexcept {
     case time_unit::nanosecond:
       return "ns";
   }
+  return "";
 }
 
 /**

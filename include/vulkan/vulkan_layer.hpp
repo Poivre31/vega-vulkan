@@ -6,9 +6,9 @@
 #include <SDL3/SDL_vulkan.h>
 #include "sdl.hpp"
 #include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_raii.hpp"
 #include "vulkan_context.hpp"
-#include <fstream>
-#include <ios>
+#include <io.hpp>
 #include "image.hpp"
 
 inline bool is_device_suitable(const vk::raii::PhysicalDevice& device) {
@@ -105,28 +105,8 @@ get_present_mode(const vk::PhysicalDevice& physical_device, const vk::raii::Surf
   return vk::PresentModeKHR::eFifo;
 }
 
-inline std::vector<char> read_file(const std::string& filename) {
-  std::ifstream file(
-      filename,
-      std::ios::ate | std::ios::binary
-  );  //> Read from file end + SPIRV is in binary
-
-  if (!file.is_open()) {
-    throw std::runtime_error("File " + filename + " failed to open");
-  }
-
-  std::streamsize size = static_cast<std::streamsize>(file.tellg());
-  std::vector<char> buffer(size);  //> Use current caracter position to
-  // find the size of the file
-  file.seekg(0, std::ios::beg);  //> And return at file beginning
-  file.read(buffer.data(), size);
-  file.close();
-
-  return buffer;
-}
-
 inline vk::raii::ShaderModule
-create_shader_module(const vk::raii::Device& device, std::vector<char> shader_code) {
+create_shader_module(const vk::raii::Device& device, std::string shader_code) {
   vk::ShaderModuleCreateInfo shader_module_info{
       .codeSize = static_cast<uint32_t>(shader_code.size()),
       .pCode    = reinterpret_cast<uint32_t*>(shader_code.data())
@@ -167,7 +147,7 @@ class vulkan_layer final : public Ilayer {
     }
     _initialised = true;
 
-    get_app_context()->vulkan_context = {
+    get_app_context()->vulkan = {
         .physical_device       = &_physical_device,
         .graphics_queue_family = _graphics_queue_family,
         .graphics_queue        = &_graphics_queue,
@@ -186,6 +166,10 @@ class vulkan_layer final : public Ilayer {
       return;
     }
     try {
+      if (get_app_context()->vulkan.recreate_graphics_pipeline) {
+        recreate_graphics_pipeline();
+        get_app_context()->vulkan.recreate_graphics_pipeline = false;
+      }
       if (get_app_context()->active_camera) {
         _push_constants.view_projection_matrix =
             get_app_context()->active_camera->get_view_projection_matrix();
@@ -635,9 +619,15 @@ class vulkan_layer final : public Ilayer {
   }
 
   void create_graphics_pipeline() {
-    vk::raii::ShaderModule shader_module = create_shader_module(
-        _device, read_file(vulkan_config::shader_path)
-    );
+    // vk::raii::ShaderModule shader_module = create_shader_module(
+    //     _device, read_file(vulkan_config::shader_path)
+    // );
+
+    vk::ShaderModuleCreateInfo shader_module_info{
+        .codeSize = get_app_context()->shader_modules[0].size(),
+        .pCode    = get_app_context()->shader_modules[0].data()
+    };
+    vk::raii::ShaderModule shader_module(_device, shader_module_info);
 
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stages{
         {.stage = vk::ShaderStageFlagBits::eVertex, .module = shader_module, .pName = "vertMain"},
@@ -759,6 +749,12 @@ class vulkan_layer final : public Ilayer {
     _graphics_pipeline = vk::raii::Pipeline(
         _device, nullptr, pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
     );
+  }
+
+  void recreate_graphics_pipeline() {
+    _device.waitIdle();
+    _graphics_pipeline = nullptr;
+    create_graphics_pipeline();
   }
 
   void create_command_pool() {

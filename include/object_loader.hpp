@@ -2,6 +2,7 @@
 #include <console/console.hpp>
 #include <filesystem>
 #include "stb_image.hpp"
+#include "timer/timer.hpp"
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
 
@@ -17,6 +18,7 @@
 
 std::pair<std::vector<vertex_3D>, std::vector<tinyobj::material_t>>
 load_object(const std::string& model_path, float scale) {  // NOLINT
+  auto timer   = scoped_timer("object-loading");
   bool silence = false;
   try {
     auto path = std::filesystem::path(model_path);

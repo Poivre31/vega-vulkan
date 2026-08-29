@@ -10,7 +10,7 @@ class assets_layer final : public Ilayer {
   using Ilayer::Ilayer;
   bool init() noexcept final {
     try {
-      vulkan_context context       = get_app_context()->vulkan_context;
+      vulkan_context context       = get_app_context()->vulkan;
       auto [sponza_mesh, textures] = load_object_and_materials(
           "resources/models/sponza/", "sponza.obj", 1. / 100
       );

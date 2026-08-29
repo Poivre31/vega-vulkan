@@ -7,9 +7,6 @@
 [submodule "vendor/spdlog"]
 	path = vendor/spdlog
 	url = https://github.com/gabime/spdlog
-[submodule "vendor/SDL3"]
-	path = vendor/SDL3
-	url = https://github.com/libsdl-org/SDL.git
 [submodule "vendor/vma-hpp"]
 	path = vendor/vma-hpp
 	url = https://github.com/YaaZ/VulkanMemoryAllocator-Hpp

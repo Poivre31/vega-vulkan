@@ -1,6 +1,8 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_scancode.h>
 #include <console/console.hpp>
 #include <timer/timer.hpp>
 #include "layer.hpp"
@@ -55,6 +57,8 @@ class sdl_layer final : public Ilayer {
         case (SDL_EVENT_KEY_DOWN):
           if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
             get_app_context()->running = false;
+          } else if (event.key.scancode == SDL_SCANCODE_R && !event.key.repeat) {
+            get_app_context()->recompile_shaders = true;
           }
           break;
 

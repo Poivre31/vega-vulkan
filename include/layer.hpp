@@ -1,8 +1,10 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <cstdint>
 #include "camera_class.hpp"
 #include "mesh.hpp"
 #include "image.hpp"
+#include "vulkan/vulkan.hpp"
 
 struct resources_data {
   std::vector<mesh_3D>* meshes             = nullptr;
@@ -34,16 +36,18 @@ struct application_context {
     float dy;
   } mouse_data{};
 
-  vulkan_context vulkan_context;
+  vulkan_context vulkan;
 
   resources_data resources;
+
+  std::vector<std::vector<uint32_t>> shader_modules;
+  bool recompile_shaders = false;
 };
 
 bool is_context_valid(application_context& context) {
-  return context.window && context.active_camera && context.vulkan_context.allocator
-         && context.vulkan_context.command_pool && context.vulkan_context.device
-         && context.vulkan_context.physical_device && context.vulkan_context.graphics_queue
-         && context.resources.meshes;
+  return context.window && context.active_camera && context.vulkan.allocator
+         && context.vulkan.command_pool && context.vulkan.device && context.vulkan.physical_device
+         && context.vulkan.graphics_queue && context.resources.meshes;
 }
 
 class Ilayer {
