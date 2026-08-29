@@ -7,6 +7,7 @@
 #include <vector>
 #include "console/console.hpp"
 #include "layer.hpp"
+#include "timer/timer.hpp"
 #include "vulkan/vulkan.hpp"
 #include <io.hpp>
 
@@ -22,6 +23,10 @@
 class slang_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
+  slang_layer(application_context* context) : Ilayer(context) {
+    // CREATE SESSION
+    slang::createGlobalSession(_global_session.writeRef());
+  }
   bool init() noexcept final { return load_shaders(); }
   void update(double dt) noexcept final {
     const bool* key_states = SDL_GetKeyboardState(nullptr);
@@ -50,12 +55,10 @@ class slang_layer final : public Ilayer {
   }
 
   bool load_shaders() {
-    // CREATE SESSION
-    Slang::ComPtr<slang::IGlobalSession> global_session;
-    slang::createGlobalSession(global_session.writeRef());
+    auto timer = scoped_timer("shader-compiling");
 
     slang::TargetDesc target_description{
-        .format = SLANG_SPIRV, .profile = global_session->findProfile("unknown")
+        .format = SLANG_SPIRV, .profile = _global_session->findProfile("unknown")
     };
 #ifdef NDEBUG
     std::array<slang::CompilerOptionEntry, 2> options{
@@ -104,18 +107,17 @@ class slang_layer final : public Ilayer {
         .compilerOptionEntryCount = options.size(),
     };
 
-    Slang::ComPtr<slang::ISession> session;
-    global_session->createSession(session_description, session.writeRef());
+    Slang::ComPtr<slang::ISession> _session;
+    _global_session->createSession(session_description, _session.writeRef());
 
     // LOAD MODULE
-
     auto simple_shader = read_file("resources/shaders/lit_shader.slang");
     Slang::ComPtr<slang::IModule> slang_module;
     {
       Slang::ComPtr<slang::IBlob> diagnostics;
       const char* module_name = "simple";
       const char* module_path = "simple.slang";
-      slang_module            = session->loadModuleFromSourceString(
+      slang_module            = _session->loadModuleFromSourceString(
           module_name, module_path, simple_shader.data(), diagnostics.writeRef()
       );
       diagnose_if_needed(diagnostics);
@@ -153,7 +155,7 @@ class slang_layer final : public Ilayer {
     Slang::ComPtr<slang::IComponentType> composed_program;
     {
       Slang::ComPtr<slang::IBlob> diagnostics;
-      auto result = session->createCompositeComponentType(
+      auto result = _session->createCompositeComponentType(
           component_types.data(),
           SlangInt(component_types.size()),
           composed_program.writeRef(),
@@ -199,4 +201,5 @@ class slang_layer final : public Ilayer {
   }
 
   static inline vega_console _console = console::create("Slang");
+  Slang::ComPtr<slang::IGlobalSession> _global_session;
 };

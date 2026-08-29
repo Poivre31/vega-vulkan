@@ -1,5 +1,6 @@
 #include <console/console.hpp>
 #include "application.hpp"
+#include "timer/timer.hpp"
 
 class fps_layer final : public Ilayer {
  public:
@@ -21,4 +22,5 @@ int main() {
   console::set_library_consoles_log_level(level::debug);
   application<> app("App");
   app.run();
+  timer::print_all_elapsed_times(time_unit::millisecond);
 }
