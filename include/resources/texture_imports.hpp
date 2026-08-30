@@ -13,7 +13,7 @@ struct texture_info {
 void upload_textures(application_context* context, std::vector<stb_image>&& cpu_textures) {
   auto textures = std::move(cpu_textures);
   for (auto& image : textures) {
-    context->resources.textures.emplace_back(
+    context->resources.textures_.push(
         std::move(load_texture_to_gpu(context->vulkan, std::move(image)))
     );
   }

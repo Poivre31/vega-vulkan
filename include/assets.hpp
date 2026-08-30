@@ -12,7 +12,7 @@
 
 void update_texture_descriptor(application_context* context) {
   std::vector<vk::DescriptorImageInfo> image_descriptors;
-  for (auto& texture : context->resources.textures) {
+  for (auto& texture : context->resources.textures_) {
     vk::DescriptorImageInfo image_info{
         .sampler     = context->resources.sampler,
         .imageView   = texture.view,
@@ -62,21 +62,21 @@ class assets_layer final : public Ilayer {
       };
       resources.sampler = vk::raii::Sampler(*vk_context.device, sampler_info);
 
-      // resources.meshes.emplace_back(create_cube({1.F, 0.F, 0.F}, 0.3F));
-      for (auto& mesh : resources.meshes) {
+      load_object_and_materials(get_app_context(), meshes::sponza);
+      load_object_and_materials(get_app_context(), meshes::tank);
+
+      auto cube = resources.meshes_.push(create_cube({1.F, 0.F, 0.F}, 0.3F));
+      for (auto& mesh : resources.meshes_) {
         mesh.create_vertex_buffer(vk_context);
       }
 
       std::vector<stb_image> cpu_images;
       cpu_images.emplace_back(textures::beer.texture_path);
       for (auto& image : cpu_images) {
-        resources.textures.emplace_back(
+        auto h = resources.textures_.push(
             std::move(load_texture_to_gpu(vk_context, std::move(image)))
         );
       }
-
-      load_object_and_materials(get_app_context(), meshes::sponza);
-      load_object_and_materials(get_app_context(), meshes::tank);
 
       update_texture_descriptor(get_app_context());
 

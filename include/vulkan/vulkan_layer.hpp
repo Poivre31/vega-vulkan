@@ -957,7 +957,7 @@ class vulkan_layer final : public Ilayer {
         _push_constants
     );
 
-    for (auto& mesh : get_app_context()->resources.meshes) {
+    for (const auto& mesh : get_app_context()->resources.meshes_) {
       mesh.render(command_buffer);
     }
 

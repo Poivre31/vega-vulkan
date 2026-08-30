@@ -89,7 +89,7 @@ class mesh_3D {
     submit_single_command_buffer(context, std::move(cmd));
   }
 
-  void render(vk::raii::CommandBuffer& command_buffer) {
+  void render(vk::raii::CommandBuffer& command_buffer) const {
     if (!*_buffer) {
       console::get(consoles::assets)
           ->warn("Skipped rendering mesh because its vertex buffer hasn't been created yet");

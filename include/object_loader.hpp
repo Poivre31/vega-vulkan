@@ -167,11 +167,12 @@ std::pair<std::vector<vertex_3D>, std::vector<stb_image>> load_object_and_materi
 
 /** Should be followed by a call to 'update_texture_descriptor(app_context*)' */
 void load_object_and_materials(application_context* context, const model_info& info) {
-  auto [mesh, textures] = load_object_and_materials(
+  auto [mesh_data, textures] = load_object_and_materials(
       info.object_folder, info.mesh_name, info.scale, info.z_is_up
   );
   upload_textures(context, std::move(textures));
-  // _meshes.emplace_back(create_cube({1.F, 0.F, 0.F}, 0.3F));
-  context->resources.meshes.emplace_back(mesh);
-  context->resources.meshes.back().create_vertex_buffer(context->vulkan);
+
+  mesh_3D mesh(mesh_data);
+  mesh.create_vertex_buffer(context->vulkan);
+  context->resources.meshes_.push(std::move(mesh));
 }

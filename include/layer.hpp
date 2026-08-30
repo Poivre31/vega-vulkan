@@ -4,12 +4,16 @@
 #include "camera_class.hpp"
 #include "mesh.hpp"
 #include "image.hpp"
+#include "allocator.hpp"
 
 struct resources_data {
   vk::raii::Sampler sampler = nullptr;
   std::vector<mesh_3D> meshes;
   std::vector<gpu_image> textures;
   vk::raii::DescriptorSets descriptor_sets = nullptr;
+
+  static_allocator<mesh_3D> meshes_;
+  static_allocator<gpu_image> textures_;
 };
 
 struct application_context {
