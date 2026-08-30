@@ -4,11 +4,11 @@
 #include "camera_class.hpp"
 #include "mesh.hpp"
 #include "image.hpp"
-#include "vulkan/vulkan.hpp"
 
 struct resources_data {
-  std::vector<mesh_3D>* meshes             = nullptr;
-  std::vector<gpu_image>* textures         = nullptr;
+  vk::raii::Sampler sampler = nullptr;
+  std::vector<mesh_3D> meshes;
+  std::vector<gpu_image> textures;
   vk::raii::DescriptorSets descriptor_sets = nullptr;
 };
 
@@ -48,7 +48,7 @@ struct application_context {
 bool is_context_valid(application_context& context) {
   return context.window && context.active_camera && context.vulkan.allocator
          && context.vulkan.command_pool && context.vulkan.device && context.vulkan.physical_device
-         && context.vulkan.graphics_queue && context.resources.meshes;
+         && context.vulkan.graphics_queue;
 }
 
 class Ilayer {

@@ -1,11 +1,15 @@
 #pragma once
 #include <console/console.hpp>
 #include <filesystem>
+#include <utility>
 #include "glm/geometric.hpp"
+#include "layer.hpp"
 #include "stb_image.hpp"
 #include "timer/timer.hpp"
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
+#include "resources/mesh_imports.hpp"
+#include "resources/texture_imports.hpp"
 
 // class material_manager {
 //  public:
@@ -18,7 +22,7 @@
 // };
 
 std::pair<std::vector<vertex_3D>, std::vector<tinyobj::material_t>>
-load_object(const std::string& model_path, float scale) {  // NOLINT
+load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = true) {  // NOLINT
   auto timer   = scoped_timer("object-loading");
   bool silence = false;
   try {
@@ -61,6 +65,11 @@ load_object(const std::string& model_path, float scale) {  // NOLINT
 
     std::vector<vertex_3D> vertices;
 
+    int x_offset = 0, y_offset = 1, z_offset = 2;
+    if (!z_is_up) {
+      std::swap(y_offset, z_offset);
+    }
+
     for (const auto& shape : shapes) {
       size_t shape_offset = 0;
       for (size_t face = 0; face < shape.mesh.num_face_vertices.size(); face++) {
@@ -71,19 +80,19 @@ load_object(const std::string& model_path, float scale) {  // NOLINT
         for (size_t v = 0; v < number_face_vertices; v++) {
           tinyobj::index_t idx = shape.mesh.indices[shape_offset + v];
           face_vertices.at(v).position.x =
-              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 0] * scale;
-          face_vertices.at(v).position.z =
-              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 1] * scale;
+              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + x_offset] * scale;
           face_vertices.at(v).position.y =
-              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 2] * scale;
+              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + y_offset] * scale;
+          face_vertices.at(v).position.z =
+              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + z_offset] * scale;
 
           if (idx.normal_index >= 0) {
             face_vertices.at(v).normal.x =
-                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 0];
-            face_vertices.at(v).normal.z =
-                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 1];
+                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + x_offset];
             face_vertices.at(v).normal.y =
-                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 2];
+                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + y_offset];
+            face_vertices.at(v).normal.z =
+                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + z_offset];
           } else {
             create_face_normals = true;
           }
@@ -129,9 +138,10 @@ load_object(const std::string& model_path, float scale) {  // NOLINT
 std::pair<std::vector<vertex_3D>, std::vector<stb_image>> load_object_and_materials(
     const std::string& model_directory,
     const std::string& model_name,
-    float scale
+    float scale  = 1.F,
+    bool z_is_up = true
 ) {
-  auto [vertices, materials] = load_object(model_directory + model_name, scale);
+  auto [vertices, materials] = load_object(model_directory + model_name, scale, z_is_up);
 
   std::vector<stb_image> images;
   images.reserve(materials.size());
@@ -153,4 +163,15 @@ std::pair<std::vector<vertex_3D>, std::vector<stb_image>> load_object_and_materi
   }
 
   return {vertices, std::move(images)};
+}
+
+/** Should be followed by a call to 'update_texture_descriptor(app_context*)' */
+void load_object_and_materials(application_context* context, const model_info& info) {
+  auto [mesh, textures] = load_object_and_materials(
+      info.object_folder, info.mesh_name, info.scale, info.z_is_up
+  );
+  upload_textures(context, std::move(textures));
+  // _meshes.emplace_back(create_cube({1.F, 0.F, 0.F}, 0.3F));
+  context->resources.meshes.emplace_back(mesh);
+  context->resources.meshes.back().create_vertex_buffer(context->vulkan);
 }

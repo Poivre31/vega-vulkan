@@ -86,8 +86,9 @@ gpu_image create_image(
   return {.image = std::move(image), .view = std::move(view)};
 }
 
-gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image texture) {
-  uint64_t size = texture.byte_size();
+gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image&& cpu_texture) {
+  stb_image texture = std::move(cpu_texture);
+  uint64_t size     = texture.byte_size();
   vk::BufferCreateInfo staging_buffer_info{
       .size        = size,
       .usage       = vk::BufferUsageFlagBits::eTransferSrc,
