@@ -34,6 +34,7 @@ target_sources(VegaVulkan PRIVATE
     "include/resources/mesh_imports.hpp"
     "include/resources/texture_imports.hpp"
     "include/allocator.hpp"
+    "include/material.hpp"
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 

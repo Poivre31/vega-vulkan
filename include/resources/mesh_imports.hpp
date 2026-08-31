@@ -1,10 +1,15 @@
 #pragma once
 
+#include "allocator.hpp"
+
+class mesh_3D;
+
 struct model_info {
   std::string object_folder;
   std::string mesh_name;
   float scale  = 1.F;
   bool z_is_up = true;
+  mutable handle<mesh_3D> mesh{};
 };
 
 namespace meshes {

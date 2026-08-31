@@ -1,9 +1,11 @@
 #pragma once
 #include "glm.hpp"  // IWYU pragma: keep
 #include "graphics.hpp"
+#include "image.hpp"
 #include "vulkan_context.hpp"
 #include "vulkan/single_command_buffer.hpp"
 #include <console/console.hpp>
+#include "allocator.hpp"
 
 struct vertex_3D {
   glm::vec3 position{};
@@ -89,6 +91,10 @@ class mesh_3D {
     submit_single_command_buffer(context, std::move(cmd));
   }
 
+  //   void set_texture_handles(const std::vector<handle<gpu_image>>& handles) {
+  //     _texture_handles = handles;
+  //   }
+
   void render(vk::raii::CommandBuffer& command_buffer) const {
     if (!*_buffer) {
       console::get(consoles::assets)
@@ -101,5 +107,6 @@ class mesh_3D {
 
  private:
   std::vector<vertex_3D> _vertices;
+  //   std::vector<handle<gpu_image>> _texture_handles;
   vma::raii::Buffer _buffer = nullptr;
 };

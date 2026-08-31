@@ -10,8 +10,9 @@
 template <typename T>
 struct handle {
   uint32_t index{};
-  uint16_t generation{};
   uint16_t allocator_id{};
+  uint16_t generation : 15 {};
+  uint16_t valid      : 1 = false;
 };
 
 template <std::move_constructible T>
@@ -110,7 +111,12 @@ class allocator {
       _objects.at(index).emplace(std::forward<Args>(args)...);
     }
 
-    return {.index = index, .generation = _objects.at(index).generation(), .allocatorId = _id};
+    return {
+        .index       = index,
+        .allocatorId = _id,
+        .generation  = _objects.at(index).generation(),
+        .valid       = true
+    };
   }
 
   void pop(handle<T> handle) {
@@ -120,14 +126,6 @@ class allocator {
   }
 
   [[nodiscard]] T* get(handle<T> handle) { return _objects.at(get_index(handle)).get(); }
-  // [[nodiscard]] std::optional<Handle> getHandle(const T& object) {
-  //   for (auto& slot : _objects) {
-  //     if (slot.get() == &object && slot.isFree()) {
-  //       return Handle{slot.generation()};
-  //     }
-  //   }
-  //   return std::nullopt;
-  // }
   [[nodiscard]] T* at_index(uint32_t index) {
     if (_objects.at(index).isFree()) {
       throw std::domain_error("Trying to access index that is not assigned");
@@ -146,7 +144,12 @@ class allocator {
 
  private:
   [[nodiscard]] uint32_t get_index(handle<T> handle) const {
-    if (handle.allocator_id != _id) {
+    if (!handle.valid) {
+      throw std::invalid_argument(
+          "Invalid handle, it has not been created by a allocator::push call or it has been "
+          "modified"
+      );
+    } else if (handle.allocator_id != _id) {
       throw std::invalid_argument(
           "Trying to access an allocator with a handle that hasn't been created with the same "
           "allocator"
@@ -190,7 +193,7 @@ class static_allocator {
     index = _objects.size();
     _objects.emplace_back(std::forward<Args>(args)...);
 
-    return {.index = index, .generation = _generation, .allocator_id = _id};
+    return {.index = index, .allocator_id = _id, .generation = _generation, .valid = true};
   }
 
   [[nodiscard]] T* get(handle<T> handle) { return _objects.at(get_index(handle)).get(); }
@@ -210,7 +213,12 @@ class static_allocator {
 
  private:
   [[nodiscard]] uint32_t get_index(handle<T> handle) const {
-    if (handle.allocator_id != _id) {
+    if (!handle.valid) {
+      throw std::invalid_argument(
+          "Invalid handle, it has not been created by a allocator::push call or it has been "
+          "modified"
+      );
+    } else if (handle.allocator_id != _id) {
       throw std::invalid_argument(
           "Trying to access an allocator with a handle that hasn't been created with the same "
           "allocator"

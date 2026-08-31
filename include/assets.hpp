@@ -11,6 +11,11 @@
 #include "vulkan_context.hpp"
 
 void update_texture_descriptor(application_context* context) {
+  console::get(consoles::assets)
+      ->warn(
+          "TO DO: move to a fixed size arena for textures and make it efficient to update "
+          "descriptors"
+      );
   std::vector<vk::DescriptorImageInfo> image_descriptors;
   for (auto& texture : context->resources.textures_) {
     vk::DescriptorImageInfo image_info{
@@ -65,7 +70,11 @@ class assets_layer final : public Ilayer {
       load_object_and_materials(get_app_context(), meshes::sponza);
       load_object_and_materials(get_app_context(), meshes::tank);
 
-      auto cube = resources.meshes_.push(create_cube({1.F, 0.F, 0.F}, 0.3F));
+      auto beer = resources.textures_.push(
+          std::move(load_texture_to_gpu(vk_context, stb_image(textures::beer.texture_path)))
+      );
+
+      auto cube = resources.meshes_.push(create_cube({1.F, 0.F, 1.F}, 0.5F, beer));
       for (auto& mesh : resources.meshes_) {
         mesh.create_vertex_buffer(vk_context);
       }
@@ -73,9 +82,7 @@ class assets_layer final : public Ilayer {
       std::vector<stb_image> cpu_images;
       cpu_images.emplace_back(textures::beer.texture_path);
       for (auto& image : cpu_images) {
-        auto h = resources.textures_.push(
-            std::move(load_texture_to_gpu(vk_context, std::move(image)))
-        );
+        resources.textures_.push(std::move(load_texture_to_gpu(vk_context, std::move(image))));
       }
 
       update_texture_descriptor(get_app_context());

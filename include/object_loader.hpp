@@ -166,13 +166,19 @@ std::pair<std::vector<vertex_3D>, std::vector<stb_image>> load_object_and_materi
 }
 
 /** Should be followed by a call to 'update_texture_descriptor(app_context*)' */
-void load_object_and_materials(application_context* context, const model_info& info) {
-  auto [mesh_data, textures] = load_object_and_materials(
-      info.object_folder, info.mesh_name, info.scale, info.z_is_up
-  );
-  upload_textures(context, std::move(textures));
+handle<mesh_3D> load_object_and_materials(application_context* context, const model_info& info) {
+  if (!info.mesh.valid) {
+    auto [mesh_data, textures] = load_object_and_materials(
+        info.object_folder, info.mesh_name, info.scale, info.z_is_up
+    );
+    auto texture_indices = upload_textures(context, std::move(textures));
+    for (auto& vertex : mesh_data) {
+      vertex.material_id = texture_indices[vertex.material_id].index;
+    }
 
-  mesh_3D mesh(mesh_data);
-  mesh.create_vertex_buffer(context->vulkan);
-  context->resources.meshes_.push(std::move(mesh));
+    mesh_3D mesh(mesh_data);
+    mesh.create_vertex_buffer(context->vulkan);
+    info.mesh = context->resources.meshes_.push(std::move(mesh));
+  }
+  return info.mesh;
 }

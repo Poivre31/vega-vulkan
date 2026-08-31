@@ -1,4 +1,6 @@
 #pragma once
+#include "image.hpp"
+#include "material.hpp"
 #include "mesh.hpp"
 
 template <typename T>
@@ -9,62 +11,74 @@ constexpr std::vector<T> combine(const std::vector<T>& v1, const std::vector<T>&
   return std::move(v);
 }
 
-constexpr std::vector<vertex_3D>
-create_quad(glm::vec3 v1, glm::vec3 v2, glm::vec3 v3, glm::vec3 v4, glm::vec3 color) {
+constexpr std::vector<vertex_3D> create_quad(
+    glm::vec3 v1,
+    glm::vec3 v2,
+    glm::vec3 v3,
+    glm::vec3 v4,
+    glm::vec3 color,
+    handle<gpu_image> mat
+) {
   auto n1 = glm::cross(v2 - v1, v3 - v1);
   auto n2 = glm::cross(v3 - v1, v4 - v1);
   return {
-      {.position = v1, .normal = n1, .uv = {0.F, 0.F}},
-      {.position = v2, .normal = n1, .uv = {0.F, 1.F}},
-      {.position = v3, .normal = n1, .uv = {1.F, 1.F}},
-      {.position = v3, .normal = n2, .uv = {1.F, 1.F}},
-      {.position = v4, .normal = n2, .uv = {1.F, 0.F}},
-      {.position = v1, .normal = n2, .uv = {0.F, 0.F}}
+      {.position = v1, .normal = n1, .uv = {0.F, 0.F}, .material_id = mat.index},
+      {.position = v2, .normal = n1, .uv = {0.F, 1.F}, .material_id = mat.index},
+      {.position = v3, .normal = n1, .uv = {1.F, 1.F}, .material_id = mat.index},
+      {.position = v3, .normal = n2, .uv = {1.F, 1.F}, .material_id = mat.index},
+      {.position = v4, .normal = n2, .uv = {1.F, 0.F}, .material_id = mat.index},
+      {.position = v1, .normal = n2, .uv = {0.F, 0.F}, .material_id = mat.index}
   };
 }
 
-mesh_3D create_cube(glm::vec3 position, float size) {
+mesh_3D create_cube(glm::vec3 position, float size, handle<gpu_image> mat) {
   auto face1 = create_quad(
       position + glm::vec3{size / 2, size / 2, size / 2},
       position + glm::vec3{-size / 2, size / 2, size / 2},
       position + glm::vec3{-size / 2, -size / 2, size / 2},
       position + glm::vec3{size / 2, -size / 2, size / 2},
-      {1., 1., 1.}
+      {1., 1., 1.},
+      mat
   );
   auto face2 = create_quad(
       position + glm::vec3{size / 2, size / 2, -size / 2},
       position + glm::vec3{-size / 2, size / 2, -size / 2},
       position + glm::vec3{-size / 2, -size / 2, -size / 2},
       position + glm::vec3{size / 2, -size / 2, -size / 2},
-      {1., 1., 1.}
+      {1., 1., 1.},
+      mat
   );
   auto face3 = create_quad(
       position + glm::vec3{size / 2, size / 2, size / 2},
       position + glm::vec3{size / 2, -size / 2, size / 2},
       position + glm::vec3{size / 2, -size / 2, -size / 2},
       position + glm::vec3{size / 2, size / 2, -size / 2},
-      {1., 1., 1.}
+      {1., 1., 1.},
+      mat
   );
   auto face4 = create_quad(
       position + glm::vec3{-size / 2, size / 2, size / 2},
       position + glm::vec3{-size / 2, size / 2, -size / 2},
       position + glm::vec3{-size / 2, -size / 2, -size / 2},
       position + glm::vec3{-size / 2, -size / 2, size / 2},
-      {1., 1., 1.}
+      {1., 1., 1.},
+      mat
   );
   auto face5 = create_quad(
       position + glm::vec3{size / 2, size / 2, size / 2},
       position + glm::vec3{-size / 2, size / 2, size / 2},
       position + glm::vec3{-size / 2, size / 2, -size / 2},
       position + glm::vec3{size / 2, size / 2, -size / 2},
-      {1., 1., 1.}
+      {1., 1., 1.},
+      mat
   );
   auto face6 = create_quad(
       position + glm::vec3{size / 2, -size / 2, size / 2},
       position + glm::vec3{size / 2, -size / 2, -size / 2},
       position + glm::vec3{-size / 2, -size / 2, -size / 2},
       position + glm::vec3{-size / 2, -size / 2, size / 2},
-      {1., 1., 1.}
+      {1., 1., 1.},
+      mat
   );
 
   return mesh_3D(

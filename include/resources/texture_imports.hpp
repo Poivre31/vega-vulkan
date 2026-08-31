@@ -10,13 +10,17 @@ struct texture_info {
   bool is_srgb        = true;
 };
 
-void upload_textures(application_context* context, std::vector<stb_image>&& cpu_textures) {
+std::vector<handle<gpu_image>>
+upload_textures(application_context* context, std::vector<stb_image>&& cpu_textures) {
   auto textures = std::move(cpu_textures);
+  std::vector<handle<gpu_image>> indices;
   for (auto& image : textures) {
-    context->resources.textures_.push(
+    auto handle = context->resources.textures_.push(
         std::move(load_texture_to_gpu(context->vulkan, std::move(image)))
     );
+    indices.push_back(handle);
   }
+  return indices;
 }
 
 namespace textures {

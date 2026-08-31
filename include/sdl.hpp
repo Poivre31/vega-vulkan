@@ -18,8 +18,6 @@ class sdl_layer final : public Ilayer {
   using Ilayer::Ilayer;
 
   bool init() noexcept final {
-    auto timer = scoped_timer("sdl-init");
-
     bool success = SDL_Init(SDL_INIT_VIDEO);
     if (!success) {
       console::get(consoles::graphics)

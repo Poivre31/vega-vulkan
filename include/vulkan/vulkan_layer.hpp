@@ -5,6 +5,7 @@
 #include <console/console.hpp>
 #include <SDL3/SDL_vulkan.h>
 #include "sdl.hpp"
+#include "timer/timer.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include "vulkan_context.hpp"
