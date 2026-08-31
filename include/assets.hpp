@@ -67,8 +67,12 @@ class assets_layer final : public Ilayer {
       };
       resources.sampler = vk::raii::Sampler(*vk_context.device, sampler_info);
 
+      // FALLBACK TEXTURE
+      auto h = resources.textures_.push(std::move(load_texture_to_gpu(vk_context, stb_image())));
+
       load_object_and_materials(get_app_context(), meshes::sponza);
       load_object_and_materials(get_app_context(), meshes::tank);
+      load_object_and_materials(get_app_context(), meshes::tyra);
 
       auto beer = resources.textures_.push(
           std::move(load_texture_to_gpu(vk_context, stb_image(textures::beer.texture_path)))

@@ -135,48 +135,47 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
   std::abort();
 }
 
-std::pair<std::vector<vertex_3D>, std::vector<stb_image>> load_object_and_materials(
-    const std::string& model_directory,
-    const std::string& model_name,
-    float scale  = 1.F,
-    bool z_is_up = true
-) {
-  auto [vertices, materials] = load_object(model_directory + model_name, scale, z_is_up);
-
-  std::vector<stb_image> images;
-  images.reserve(materials.size());
-  for (auto& material : materials) {
-    if (!material.diffuse_texname.empty()) {
-      images.emplace_back(model_directory + material.diffuse_texname);
-    } else {
-      auto color = glm::vec4(material.diffuse[0], material.diffuse[1], material.diffuse[2], 1);
-      console::get(consoles::assets)
-          ->warn(
-              "No texture specified for material {}, replacing by 1x1 texture of color ({},{},{})",
-              material.name,
-              color.r,
-              color.g,
-              color.b
-          );
-      images.emplace_back(color, 1, 1);
-    }
-  }
-
-  return {vertices, std::move(images)};
-}
-
 /** Should be followed by a call to 'update_texture_descriptor(app_context*)' */
 handle<mesh_3D> load_object_and_materials(application_context* context, const model_info& info) {
   if (!info.mesh.valid) {
-    auto [mesh_data, textures] = load_object_and_materials(
-        info.object_folder, info.mesh_name, info.scale, info.z_is_up
+    auto [vertices, materials] = load_object(
+        info.object_folder + info.mesh_name, info.scale, info.z_is_up
     );
-    auto texture_indices = upload_textures(context, std::move(textures));
-    for (auto& vertex : mesh_data) {
-      vertex.material_id = texture_indices[vertex.material_id].index;
+
+    std::vector<stb_image> textures;
+    textures.reserve(materials.size());
+    for (auto& material : materials) {
+      if (!material.diffuse_texname.empty()) {
+        textures.emplace_back(info.object_folder + material.diffuse_texname);
+      } else {
+        auto color = glm::vec4(material.diffuse[0], material.diffuse[1], material.diffuse[2], 1);
+        console::get(consoles::assets)
+            ->warn(
+                "No texture specified for material {}, replacing by 1x1 texture of color "
+                "({},{},{})",
+                material.name,
+                color.r,
+                color.g,
+                color.b
+            );
+        textures.emplace_back(color, 1, 1);
+      }
     }
 
-    mesh_3D mesh(mesh_data);
+    if (!textures.empty()) {
+      auto texture_indices = upload_textures(context, std::move(textures));
+      for (auto& vertex : vertices) {
+        vertex.material_id = context->resources.textures_.get_index(
+            texture_indices[vertex.material_id]
+        );
+      }
+    } else {
+      for (auto& vertex : vertices) {
+        vertex.material_id = 0;
+      }
+    }
+
+    mesh_3D mesh(vertices);
     mesh.create_vertex_buffer(context->vulkan);
     info.mesh = context->resources.meshes_.push(std::move(mesh));
   }

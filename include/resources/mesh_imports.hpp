@@ -28,4 +28,11 @@ const model_info sponza{
     .z_is_up       = false,
 };
 
+const model_info tyra{
+    .object_folder = "resources/models/",
+    .mesh_name     = "tyra.obj",
+    .scale         = 1.F,
+    .z_is_up       = false,
+};
+
 }  // namespace meshes

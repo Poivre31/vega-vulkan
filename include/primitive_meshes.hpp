@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include "image.hpp"
 #include "material.hpp"
 #include "mesh.hpp"
@@ -21,17 +22,23 @@ constexpr std::vector<vertex_3D> create_quad(
 ) {
   auto n1 = glm::cross(v2 - v1, v3 - v1);
   auto n2 = glm::cross(v3 - v1, v4 - v1);
+
+  uint32_t tex_index = 0;
+  if (mat.valid) {
+    tex_index = mat.index;
+  }
+
   return {
-      {.position = v1, .normal = n1, .uv = {0.F, 0.F}, .material_id = mat.index},
-      {.position = v2, .normal = n1, .uv = {0.F, 1.F}, .material_id = mat.index},
-      {.position = v3, .normal = n1, .uv = {1.F, 1.F}, .material_id = mat.index},
-      {.position = v3, .normal = n2, .uv = {1.F, 1.F}, .material_id = mat.index},
-      {.position = v4, .normal = n2, .uv = {1.F, 0.F}, .material_id = mat.index},
-      {.position = v1, .normal = n2, .uv = {0.F, 0.F}, .material_id = mat.index}
+      {.position = v1, .normal = n1, .uv = {0.F, 0.F}, .material_id = tex_index},
+      {.position = v2, .normal = n1, .uv = {0.F, 1.F}, .material_id = tex_index},
+      {.position = v3, .normal = n1, .uv = {1.F, 1.F}, .material_id = tex_index},
+      {.position = v3, .normal = n2, .uv = {1.F, 1.F}, .material_id = tex_index},
+      {.position = v4, .normal = n2, .uv = {1.F, 0.F}, .material_id = tex_index},
+      {.position = v1, .normal = n2, .uv = {0.F, 0.F}, .material_id = tex_index}
   };
 }
 
-mesh_3D create_cube(glm::vec3 position, float size, handle<gpu_image> mat) {
+mesh_3D create_cube(glm::vec3 position, float size, handle<gpu_image> mat = {}) {
   auto face1 = create_quad(
       position + glm::vec3{size / 2, size / 2, size / 2},
       position + glm::vec3{-size / 2, size / 2, size / 2},

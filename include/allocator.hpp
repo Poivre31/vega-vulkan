@@ -198,20 +198,6 @@ class static_allocator {
 
   [[nodiscard]] T* get(handle<T> handle) { return _objects.at(get_index(handle)).get(); }
   [[nodiscard]] T* at_index(uint32_t index) { return &_objects.at(index); }
-
-  [[nodiscard]] uint32_t size() const { return _objects.size(); }
-
-  void clear() {
-    _objects.clear();
-    _generation++;
-  }
-
-  auto begin() { return _objects.begin(); }
-  auto end() { return _objects.end(); }
-  auto cbegin() { return _objects.cbegin(); }
-  auto cend() { return _objects.cend(); }
-
- private:
   [[nodiscard]] uint32_t get_index(handle<T> handle) const {
     if (!handle.valid) {
       throw std::invalid_argument(
@@ -227,7 +213,7 @@ class static_allocator {
       throw std::invalid_argument(
           "Handle index is bigger than the number of stored objects, something is wrong"
       );
-    } else if (!_generation != handle.generation) {
+    } else if (_generation != handle.generation) {
       throw std::invalid_argument(
           "Handle and static allocator generation do not match, the allocator has been cleared in "
           "between"
@@ -236,6 +222,19 @@ class static_allocator {
     return handle.index;
   }
 
+  [[nodiscard]] uint32_t size() const { return _objects.size(); }
+
+  void clear() {
+    _objects.clear();
+    _generation++;
+  }
+
+  auto begin() { return _objects.begin(); }
+  auto end() { return _objects.end(); }
+  auto cbegin() { return _objects.cbegin(); }
+  auto cend() { return _objects.cend(); }
+
+ private:
   uint16_t _id{};
   uint16_t _generation = 0;
   std::vector<T> _objects;
