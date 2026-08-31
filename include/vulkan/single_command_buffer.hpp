@@ -1,6 +1,6 @@
 #pragma once
 #include "graphics.hpp"
-#include "vulkan_context.hpp"
+#include "vulkan/context.hpp"
 
 vk::raii::CommandBuffer
 begin_single_command_buffer(vk::raii::CommandPool& command_pool, vk::raii::Device& device) {

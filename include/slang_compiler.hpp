@@ -3,12 +3,12 @@
 #include <slang.h>
 #include <slang-com-ptr.h>
 #include <slang-com-helper.h>
+#include <sys/types.h>
 #include <cstdint>
 #include <vector>
 #include "console/console.hpp"
 #include "layer.hpp"
 #include "timer/timer.hpp"
-#include "vulkan/vulkan.hpp"
 #include <io.hpp>
 
 // const char* const simple_shader =
@@ -61,7 +61,7 @@ class slang_layer final : public Ilayer {
         .format = SLANG_SPIRV, .profile = _global_session->findProfile("unknown")
     };
 #ifdef NDEBUG
-    std::array<slang::CompilerOptionEntry, 2> options{
+    std::vector<slang::CompilerOptionEntry> options{
         slang::CompilerOptionEntry{
             .name = slang::CompilerOptionName::Optimization,
             .value =
@@ -79,21 +79,30 @@ class slang_layer final : public Ilayer {
         }
     };
 #else
-    std::array<slang::CompilerOptionEntry, 2> options{
+    std::vector<slang::CompilerOptionEntry> options{
+        slang::CompilerOptionEntry{
+            .name = slang::CompilerOptionName::ForceCLayout,
+            .value =
+                slang::CompilerOptionValue{
+                    .kind      = slang::CompilerOptionValueKind::Int,
+                    .intValue0 = 1,
+                }
+        },
         slang::CompilerOptionEntry{
             .name = slang::CompilerOptionName::Optimization,
             .value =
                 slang::CompilerOptionValue{
                     .kind      = slang::CompilerOptionValueKind::Int,
-                    .intValue0 = SLANG_OPTIMIZATION_LEVEL_NONE
+                    .intValue0 = SLANG_OPTIMIZATION_LEVEL_NONE,
                 }
         },
         slang::CompilerOptionEntry{
             .name  = slang::CompilerOptionName::DebugInformation,
             .value = slang::CompilerOptionValue{
-                .kind = slang::CompilerOptionValueKind::Int, .intValue0 = 1
+                .kind      = slang::CompilerOptionValueKind::Int,
+                .intValue0 = 1,
             }
-        }
+        },
     };
 #endif
 
@@ -104,7 +113,7 @@ class slang_layer final : public Ilayer {
         .preprocessorMacros       = nullptr,
         .preprocessorMacroCount   = 0,
         .compilerOptionEntries    = options.data(),
-        .compilerOptionEntryCount = options.size(),
+        .compilerOptionEntryCount = static_cast<uint32_t>(options.size()),
     };
 
     Slang::ComPtr<slang::ISession> _session;

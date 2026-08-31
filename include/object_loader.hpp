@@ -1,23 +1,17 @@
 #pragma once
 #include <console/console.hpp>
 #include <filesystem>
-#include "stb_image.hpp"
+#include <utility>
+#include "glm/geometric.hpp"
 #include "timer/timer.hpp"
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
-
-// class material_manager {
-//  public:
-//   static uint32_t generate_material_id() { return _current_id++; }
-//   static std::unordered_map<int, uint32_t> add_materials() {}
-
-//  private:
-//   static inline uint32_t _current_id = 0;
-//   // static inline std::unordered_map<u, class Ty>
-// };
+#include "resources/mesh_imports.hpp"
+#include "vulkan/config.hpp"
+#include "material.hpp"
 
 std::pair<std::vector<vertex_3D>, std::vector<tinyobj::material_t>>
-load_object(const std::string& model_path, float scale) {  // NOLINT
+load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = true) {  // NOLINT
   auto timer   = scoped_timer("object-loading");
   bool silence = false;
   try {
@@ -60,41 +54,60 @@ load_object(const std::string& model_path, float scale) {  // NOLINT
 
     std::vector<vertex_3D> vertices;
 
+    int x_offset = 0, y_offset = 1, z_offset = 2;
+    if (!z_is_up) {
+      std::swap(y_offset, z_offset);
+    }
+
     for (const auto& shape : shapes) {
       size_t shape_offset = 0;
       for (size_t face = 0; face < shape.mesh.num_face_vertices.size(); face++) {
-        auto face_vertices = static_cast<size_t>(shape.mesh.num_face_vertices[face]);
-        if (face_vertices != 3) {
-          console::get(consoles::assets)->error("Non triangle face when loading model object");
-          continue;
-        }
-        for (size_t v = 0; v < face_vertices; v++) {
+        auto number_face_vertices = static_cast<size_t>(shape.mesh.num_face_vertices[face]);
+        assert(number_face_vertices == 3 && "Non triangle face when loading model object");
+        bool create_face_normals = false;
+        std::array<vertex_3D, 3> face_vertices{};
+        for (size_t v = 0; v < number_face_vertices; v++) {
           tinyobj::index_t idx = shape.mesh.indices[shape_offset + v];
-          vertex_3D vertex;
-          vertex.position.x = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 0]
-                              * scale;
-          vertex.position.z = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 1]
-                              * scale;
-          vertex.position.y = attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + 2]
-                              * scale;
+          face_vertices.at(v).position.x =
+              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + x_offset] * scale;
+          face_vertices.at(v).position.y =
+              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + y_offset] * scale;
+          face_vertices.at(v).position.z =
+              attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + z_offset] * scale;
 
           if (idx.normal_index >= 0) {
-            vertex.normal.x = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 0];
-            vertex.normal.z = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 1];
-            vertex.normal.y = attrib.normals[3 * static_cast<size_t>(idx.normal_index) + 2];
+            face_vertices.at(v).normal.x =
+                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + x_offset];
+            face_vertices.at(v).normal.y =
+                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + y_offset];
+            face_vertices.at(v).normal.z =
+                attrib.normals[3 * static_cast<size_t>(idx.normal_index) + z_offset];
+          } else {
+            create_face_normals = true;
           }
 
           if (idx.texcoord_index >= 0) {
-            vertex.uv.x = attrib.texcoords[2 * static_cast<size_t>(idx.texcoord_index) + 0];
-            vertex.uv.y = attrib.texcoords[2 * static_cast<size_t>(idx.texcoord_index) + 1];
+            face_vertices.at(v).uv.x =
+                attrib.texcoords[2 * static_cast<size_t>(idx.texcoord_index) + 0];
+            face_vertices.at(v).uv.y =
+                attrib.texcoords[2 * static_cast<size_t>(idx.texcoord_index) + 1];
           }
 
-          vertex.material_id = shape.mesh.material_ids[face];
-
-          vertices.push_back(vertex);
+          face_vertices.at(v).material_id = shape.mesh.material_ids[face];
         }
-        shape_offset += face_vertices;
-
+        shape_offset += number_face_vertices;
+        if (create_face_normals) {
+          auto vec1   = face_vertices[1].position - face_vertices[0].position;
+          auto vec2   = face_vertices[2].position - face_vertices[1].position;
+          auto normal = -glm::cross(vec1, vec2);
+          if (normal != glm::vec3(0.F)) {
+            normal = glm::normalize(normal);
+          }
+          for (auto& vertex : face_vertices) {
+            vertex.normal = normal;
+          }
+        }
+        vertices.insert(vertices.end(), face_vertices.begin(), face_vertices.end());
         // shapes[s].mesh.material_ids[f];
       }
     }
@@ -109,33 +122,4 @@ load_object(const std::string& model_path, float scale) {  // NOLINT
         ->error("Unexpected error loading model'{}': {}", model_path, e.what());
   }
   std::abort();
-}
-
-std::pair<std::vector<vertex_3D>, std::vector<stb_image>> load_object_and_materials(
-    const std::string& model_directory,
-    const std::string& model_name,
-    float scale
-) {
-  auto [vertices, materials] = load_object(model_directory + model_name, scale);
-
-  std::vector<stb_image> images;
-  images.reserve(materials.size());
-  for (auto& material : materials) {
-    if (!material.diffuse_texname.empty()) {
-      images.emplace_back(model_directory + material.diffuse_texname);
-    } else {
-      auto color = glm::vec4(material.diffuse[0], material.diffuse[1], material.diffuse[2], 1);
-      console::get(consoles::assets)
-          ->warn(
-              "No texture specified for material {}, replacing by 1x1 texture of color ({},{},{})",
-              material.name,
-              color.r,
-              color.g,
-              color.b
-          );
-      images.emplace_back(color, 1, 1);
-    }
-  }
-
-  return {vertices, std::move(images)};
 }

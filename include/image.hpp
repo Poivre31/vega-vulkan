@@ -3,13 +3,8 @@
 #include "graphics.hpp"
 #include "stb_image.hpp"
 #include "vulkan/buffer.hpp"
-#include "vulkan_context.hpp"
 #include "vulkan/single_command_buffer.hpp"
-
-struct gpu_image {
-  vma::raii::Image image   = nullptr;
-  vk::raii::ImageView view = nullptr;
-};
+#include "gpu_objects.hpp"
 
 void transition_image_layout(
     const vk::Image& image,
@@ -86,8 +81,9 @@ gpu_image create_image(
   return {.image = std::move(image), .view = std::move(view)};
 }
 
-gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image texture) {
-  uint64_t size = texture.byte_size();
+gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image&& cpu_texture) {
+  stb_image texture = std::move(cpu_texture);
+  uint64_t size     = texture.byte_size();
   vk::BufferCreateInfo staging_buffer_info{
       .size        = size,
       .usage       = vk::BufferUsageFlagBits::eTransferSrc,

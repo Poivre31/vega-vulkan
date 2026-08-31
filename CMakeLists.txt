@@ -5,6 +5,7 @@ project(VegaVulkan)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_FLAGS_DEBUG "-O2")
 
 add_executable(VegaVulkan)
 
@@ -25,12 +26,20 @@ target_sources(VegaVulkan PRIVATE
     "include/vulkan/buffer.hpp"
     "include/mesh.hpp"
     "include/assets.hpp"
-    "include/vulkan_context.hpp"
     "include/image.hpp"
     "include/object_loader.hpp"
-    include/global_config.hpp
-    include/slang_compiler.hpp
-    include/io.hpp
+    "include/global_config.hpp"
+    "include/slang_compiler.hpp"
+    "include/io.hpp"
+    "include/resources/mesh_imports.hpp"
+    "include/resources/texture_imports.hpp"
+    "include/allocator.hpp"
+    "include/material.hpp"
+    "include/gpu_objects.hpp"
+    "include/scene.hpp"
+    "include/vulkan/context.hpp"
+    "include/application/context.hpp"
+    "include/resources/handle.hpp"
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 
@@ -41,7 +50,7 @@ target_compile_options(VegaVulkan PRIVATE -march=x86-64 -mtune=generic)
 target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics.hpp")
 
 target_link_libraries(VegaVulkan PRIVATE
-vendor
+    vendor
 )
 
 set_target_properties(VegaVulkan PROPERTIES

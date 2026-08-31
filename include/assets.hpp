@@ -1,26 +1,59 @@
 #pragma once
 
+#include <vector>
+#include "glm/gtc/random.hpp"
+#include "image.hpp"
 #include "layer.hpp"
+#include "material.hpp"
 #include "mesh.hpp"
 #include "object_loader.hpp"  // IWYU pragma: keep
-#include "image.hpp"
+#include "resources/mesh_imports.hpp"
+#include "primitive_meshes.hpp"  // IWYU pragma: keep
+#include "resources/texture_imports.hpp"
+#include "scene.hpp"
+#include "stb_image.hpp"
+#include "vulkan/vulkan_raii.hpp"
+#include "vulkan/context.hpp"
+
+void update_texture_descriptor(vulkan_context vk_context, scene_resources& resources) {
+  console::get(consoles::assets)
+      ->warn(
+          "TO DO: move to a fixed size arena for textures and make it efficient to update "
+          "descriptors"
+      );
+  std::vector<vk::DescriptorImageInfo> image_descriptors;
+  for (auto& texture : resources.textures) {
+    vk::DescriptorImageInfo image_info{
+        .sampler     = resources.sampler,
+        .imageView   = texture.view,
+        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+    };
+    image_descriptors.push_back(image_info);
+  }
+
+  for (uint32_t i = 0; i < vulkan_config::frames_in_flight; i++) {
+    vk::WriteDescriptorSet write_descriptor_set{
+        .dstSet          = vk_context.descriptor_sets->at(i),
+        .dstBinding      = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = static_cast<uint32_t>(image_descriptors.size()),
+        .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
+        .pImageInfo      = image_descriptors.data()
+    };
+    vk_context.device->updateDescriptorSets(write_descriptor_set, {});
+  }
+}
 
 class assets_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
   bool init() noexcept final {
     try {
-      vulkan_context context       = get_app_context()->vulkan;
-      auto [sponza_mesh, textures] = load_object_and_materials(
-          "resources/models/sponza/", "sponza.obj", 1. / 100
-      );
-      _meshes.emplace_back(sponza_mesh);
-      // _meshes.emplace_back(create_cube({1.F, 0.F, 0.F}, 0.3F));
-      for (auto& mesh : _meshes) {
-        mesh.create_vertex_buffer(context);
-      }
+      vulkan_context vk_context = get_app_context()->vulkan;
+      auto& scene               = get_app_context()->active_scene;
+      auto& resources           = *scene.resources();
 
-      auto properties = context.physical_device->getProperties();
+      auto properties = vk_context.physical_device->getProperties();
       vk::SamplerCreateInfo sampler_info{
           .magFilter               = vk::Filter::eNearest,
           .minFilter               = vk::Filter::eNearest,
@@ -38,44 +71,39 @@ class assets_layer final : public Ilayer {
           .borderColor             = vk::BorderColor::eIntOpaqueBlack,
           .unnormalizedCoordinates = vk::False
       };
+      resources.sampler = vk::raii::Sampler(*vk_context.device, sampler_info);
 
-      _samplers.emplace_back(*context.device, sampler_info);
+      // TEXTURES
+      // Fallback
+      auto fallback_tex = resources.textures.push(
+          std::move(load_texture_to_gpu(vk_context, stb_image()))
+      );
+      auto fallback_mat = resources.materials.push(fallback_tex);
 
-      std::vector<stb_image> cpu_images = std::move(textures);
-      // beer.load("resources/textures/beer.png");
-      // cpu_images.emplace_back(std::move(beer));
-      // beer.load("resources/textures/beer2.png");
-      // cpu_images.emplace_back(std::move(beer));
-      // beer.load("resources/textures/statue.jpg");
-      // cpu_images.emplace_back(std::move(beer));
-      // beer.load("resources/textures/viking_room.png");
-      // cpu_images.emplace_back(std::move(beer));
+      auto beer_tex = resources.textures.push(
+          std::move(load_texture_to_gpu(vk_context, stb_image(textures::beer.texture_path)))
+      );
+      auto beer_mat = resources.materials.push(beer_tex);
 
-      std::vector<vk::DescriptorImageInfo> image_descriptors;
-      for (auto& image : cpu_images) {
-        _textures.emplace_back(std::move(load_texture_to_gpu(context, std::move(image))));
-        vk::DescriptorImageInfo imageInfo{
-            .sampler     = _samplers.back(),
-            .imageView   = _textures.back().view,
-            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-        };
-        image_descriptors.push_back(imageInfo);
+      // MODELS
+      scene.load_object_and_materials(vk_context, meshes::sponza);
+      scene.load_object_and_materials(vk_context, meshes::tank);
+      scene.load_object_and_materials(vk_context, meshes::tyra);
+      scene.load_vertex_array(create_cube({1.F, 0.F, 1.F}, 0.5F), beer_mat);
+
+      for (auto& mesh : resources.meshes) {
+        mesh.create_vertex_buffer(vk_context);
       }
 
-      for (uint32_t i = 0; i < vulkan_config::frames_in_flight; i++) {
-        vk::WriteDescriptorSet write_descriptor_set{
-            .dstSet          = context.descriptor_sets->at(i),
-            .dstBinding      = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = static_cast<uint32_t>(image_descriptors.size()),
-            .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
-            .pImageInfo      = image_descriptors.data()
-        };
-        context.device->updateDescriptorSets(write_descriptor_set, {});
-      }
+      // std::vector<stb_image> cpu_images;
+      // cpu_images.emplace_back(textures::beer.texture_path);
+      // for (auto& image : cpu_images) {
+      //   resources.textures.push(std::move(load_texture_to_gpu(vk_context, std::move(image))));
+      // }
 
-      get_app_context()->resources.meshes   = &_meshes;
-      get_app_context()->resources.textures = &_textures;
+      scene.update_texture_descriptor(vk_context);
+      scene.upload_material_buffer(vk_context);
+
     } catch (const std::exception& e) {
       console::get(consoles::assets)->error("Exception during assets initialisation: {}", e.what());
     } catch (...) {
@@ -88,7 +116,4 @@ class assets_layer final : public Ilayer {
   void cleanup() noexcept final {}
 
  private:
-  std::vector<mesh_3D> _meshes;
-  std::vector<gpu_image> _textures;
-  std::vector<vk::raii::Sampler> _samplers;
 };

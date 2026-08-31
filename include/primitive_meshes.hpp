@@ -1,4 +1,7 @@
 #pragma once
+#include <cstdint>
+#include "image.hpp"
+#include "material.hpp"
 #include "mesh.hpp"
 
 template <typename T>
@@ -13,6 +16,7 @@ constexpr std::vector<vertex_3D>
 create_quad(glm::vec3 v1, glm::vec3 v2, glm::vec3 v3, glm::vec3 v4, glm::vec3 color) {
   auto n1 = glm::cross(v2 - v1, v3 - v1);
   auto n2 = glm::cross(v3 - v1, v4 - v1);
+
   return {
       {.position = v1, .normal = n1, .uv = {0.F, 0.F}},
       {.position = v2, .normal = n1, .uv = {0.F, 1.F}},
@@ -23,7 +27,7 @@ create_quad(glm::vec3 v1, glm::vec3 v2, glm::vec3 v3, glm::vec3 v4, glm::vec3 co
   };
 }
 
-mesh_3D create_cube(glm::vec3 position, float size) {
+std::vector<vertex_3D> create_cube(glm::vec3 position, float size) {
   auto face1 = create_quad(
       position + glm::vec3{size / 2, size / 2, size / 2},
       position + glm::vec3{-size / 2, size / 2, size / 2},
@@ -67,7 +71,5 @@ mesh_3D create_cube(glm::vec3 position, float size) {
       {1., 1., 1.}
   );
 
-  return mesh_3D(
-      combine(face1, combine(face2, combine(face3, combine(face4, combine(face5, face6)))))
-  );
+  return combine(face1, combine(face2, combine(face3, combine(face4, combine(face5, face6)))));
 }

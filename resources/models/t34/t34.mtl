@@ -1,0 +1,60 @@
+# Blender 5.2.1 LTS MTL File: 'T-34 Russian Tank.blend'
+# www.blender.org
+
+newmtl Carroceria
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd T 34_Carroceria_BaseColor.png
+map_Ns T 34_Carroceria_Roughness.png
+map_refl T 34_Carroceria_Metallic.png
+map_Bump -bm 1.000000 T 34_Carroceria_Normal.png
+
+newmtl Faro
+Ns 1000.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Lights0012_350.jpg
+
+newmtl Orugas
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd T 34_Orugas_BaseColor.png
+map_Ns T 34_Orugas_Roughness.png
+map_refl T 34_Orugas_Metallic.png
+map_Bump -bm 1.000000 T 34_Orugas_Normal.png
+
+newmtl Ruedas
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd T 34_Ruedas_BaseColor.png
+map_Ns T 34_Ruedas_Roughness.png
+map_refl T 34_Ruedas_Metallic.png
+map_Bump -bm 1.000000 T 34_Ruedas_Normal.png
+
+newmtl Torreta
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd T 34_Torreta_BaseColor.png
+map_Ns T 34_Torreta_Roughness.png
+map_refl T 34_Torreta_Metallic.png
+map_Bump -bm 1.000000 T 34_Torreta_Normal.png
