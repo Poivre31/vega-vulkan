@@ -34,7 +34,7 @@ constexpr bool vsync = true;
 
 const std::string shader_path = "resources/shaders/lit_shader.spv";
 
-constexpr uint32_t max_number_of_textures = 64;
+constexpr uint32_t max_number_of_textures = 1024;
 
 constexpr uint32_t frames_in_flight  = 2;
 constexpr vk::ClearValue clear_color = vk::ClearColorValue(0.9F, 0.1F, 0.2F, 1.F);

@@ -87,9 +87,9 @@ class assets_layer final : public Ilayer {
 
       // MODELS
       scene.load_object_and_materials(vk_context, meshes::sponza);
-      scene.load_object_and_materials(vk_context, meshes::tank);
-      scene.load_object_and_materials(vk_context, meshes::tyra);
-      scene.load_vertex_array(create_cube({1.F, 0.F, 1.F}, 0.5F), beer_mat);
+      // scene.load_object_and_materials(vk_context, meshes::tank);
+      // scene.load_object_and_materials(vk_context, meshes::tyra);
+      // scene.load_vertex_array(create_cube({1.F, 0.F, 1.F}, 0.5F), beer_mat);
 
       for (auto& mesh : resources.meshes) {
         mesh.create_vertex_buffer(vk_context);

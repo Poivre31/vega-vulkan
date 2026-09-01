@@ -2,13 +2,9 @@
 #include <console/console.hpp>
 #include <filesystem>
 #include <utility>
-#include "glm/geometric.hpp"
 #include "timer/timer.hpp"
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
-#include "resources/mesh_imports.hpp"
-#include "vulkan/config.hpp"
-#include "material.hpp"
 
 std::pair<std::vector<vertex_3D>, std::vector<tinyobj::material_t>>
 load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = true) {  // NOLINT
@@ -33,24 +29,32 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
       console::get(consoles::assets)->trace("Loading model: found model at '{:s}'", path.string());
     }
 
-    tinyobj::ObjReaderConfig reader_config{};
-    tinyobj::ObjReader reader{};
+    tinyobj::basic_attrib_t<> attrib;
+    std::vector<tinyobj::basic_shape_t<>> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
 
-    if (!reader.ParseFromFile(model_path, reader_config)) {
-      if (!reader.Error().empty()) {
-        console::get(consoles::assets)
-            ->error("TinyObjReader error when loading model, aborting: {:s}", reader.Error());
-      }
+    tinyobj::OptLoadConfig config;
+    config.triangulate = true;
+    config.num_threads = -1;
+
+    bool ok = tinyobj::LoadObjOpt(
+        &attrib,
+        &shapes,
+        &materials,
+        &warn,
+        &err,
+        model_path.data(),
+        /* mtl_basedir */ nullptr,
+        config
+    );
+    if (!warn.empty()) {
+      console::get(consoles::assets)->warn("Tinyobj loader warning : {}", warn);
+    }
+    if (!ok) {
+      console::get(consoles::assets)->warn("Tinyobj loader error : {}", err);
       std::abort();
     }
-    if (!reader.Warning().empty() && vulkan_config::enable_validation) {  // TO DO: Separate config
-      console::get(consoles::assets)
-          ->warn("TinyObjReader warning when loading model: {:s}", reader.Warning());
-    }
-
-    const auto& attrib    = reader.GetAttrib();
-    const auto& shapes    = reader.GetShapes();
-    const auto& materials = reader.GetMaterials();
 
     std::vector<vertex_3D> vertices;
 

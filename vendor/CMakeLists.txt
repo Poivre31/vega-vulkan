@@ -96,7 +96,6 @@ target_compile_definitions(vendor INTERFACE STB_IMAGE_IMPLEMENTATION)
 
 # GLTF
 target_include_directories(vendor INTERFACE tinygltf)
-
 target_compile_definitions(vendor INTERFACE TINYGLTF_IMPLEMENTATION)
 # END GLTF
 
@@ -107,6 +106,8 @@ target_compile_definitions(vendor INTERFACE
     TINYOBJLOADER_IMPLEMENTATION
     TINYOBJLOADER_USE_MAPBOX_EARCUT
     TINYOBJLOADER_STREAM_READER_MAX_BYTES=-1
+    TINYOBJLOADER_USE_MULTITHREADING
+    TINYOBJLOADER_USE_SIMD
 )
 
 # END OBJ
