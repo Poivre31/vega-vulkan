@@ -110,7 +110,7 @@ gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image&& cpu_tex
       vk::ImageAspectFlagBits::eColor
   );
 
-  auto cmd = begin_single_command_buffer(context);
+  auto cmd = begin_transient_command_buffer(context);
   transition_image_layout(
       image.image,
       cmd,

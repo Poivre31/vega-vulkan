@@ -28,7 +28,7 @@ void timer::create(const std::string& name) noexcept {
 
     _watches.emplace(name, timer_data{.t0 = steady_clock::now()});
 
-    _console->trace("Started timer [{:s}]", name);
+    _console->trace("Created timer [{:s}]", name);
   } catch (...) {
     handle_exception("Timer/creation");
   }
@@ -56,7 +56,7 @@ void timer::pause(const std::string& name) noexcept {
     watch.offset  += delta_time(watch.t0, steady_clock::now(), time_unit::nanosecond);
     watch.running  = false;
     watch.t0       = steady_clock::now();
-    _console->trace("Paused timer [{:s}]", name);
+    // _console->trace("Paused timer [{:s}]", name);
   } catch (...) {
     handle_exception("Timer/pause");
   }
@@ -86,7 +86,7 @@ void timer::resume(const std::string& name) noexcept {
     // double dt     = delta_time(watch.t0, steady_clock::now(), default_time_unit);
     watch.t0      = steady_clock::now();
     watch.running = true;
-    _console->trace("Resumed timer [{:s}]", name);
+    // _console->trace("Resumed timer [{:s}]", name);
   } catch (...) {
     handle_exception("Timer/resume");
   }

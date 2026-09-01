@@ -183,16 +183,13 @@ class vulkan_layer final : public Ilayer {
         throw std::runtime_error("No active camera set");
         _push_constants.view_projection_matrix = glm::mat4x4{1.F};
       }
-      vk::BufferDeviceAddressInfo address_info{
-          .buffer = get_app_context()->active_scene.resources()->material_buffer
-      };
-      vk::DeviceAddress material_buffer_adress = _device.getBufferAddress(address_info);
-      if (!material_buffer_adress) {
-        throw std::runtime_error("Material buffer adresss is invalid");
-      }
-      _push_constants.material_buffer = material_buffer_adress;
-      _push_constants.material_count  = get_app_context()->active_scene.materials()->size();
-      _push_constants.time            = static_cast<float>(timer::get_elapsed_time());
+
+      _push_constants.material_buffer =
+          get_app_context()->active_scene.resources()->material_buffer.get_adress(
+              get_app_context()->vulkan
+          );
+      _push_constants.material_count = get_app_context()->active_scene.materials()->size();
+      _push_constants.time           = static_cast<float>(timer::get_elapsed_time());
       draw_frame();
     } catch (...) {
       handle_exception("update");
@@ -796,7 +793,7 @@ class vulkan_layer final : public Ilayer {
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
         vk::ImageAspectFlagBits::eDepth
     );
-    auto cmd = begin_single_command_buffer(_command_pool, _device);
+    auto cmd = begin_transient_command_buffer(_command_pool, _device);
     transition_image_layout(
         *_depth_image.image,
         cmd,

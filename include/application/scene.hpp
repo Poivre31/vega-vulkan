@@ -14,13 +14,15 @@
 #include "graphics/context.hpp"
 #include "graphics/config.hpp"
 #include "graphics/gpu_objects.hpp"
+#include "graphics/buffer.hpp"
 
 struct scene_resources {
   static_allocator<mesh_3D> meshes;
   static_allocator<material> materials;
   static_allocator<gpu_image> textures;
-  vk::raii::Sampler sampler         = nullptr;
-  vma::raii::Buffer material_buffer = nullptr;
+  vk::raii::Sampler sampler                 = nullptr;
+  // vma::raii::Buffer material_buffer = nullptr;
+  host_buffer<gpu_material> material_buffer = nullptr;
 
   handle<gpu_image> fallback_tex;
   handle<material> default_mat;
@@ -172,7 +174,8 @@ class scene {
         .usage = vma::MemoryUsage::eAutoPreferDevice
     };
 
-    _resources.material_buffer = vk_context.allocator->createBuffer(buffer_info, allocation_info);
+    // _resources.material_buffer = vk_context.allocator->createBuffer(buffer_info,
+    // allocation_info);
 
     std::vector<gpu_material> g_materials;
     g_materials.reserve(_resources.materials.size());
@@ -184,8 +187,11 @@ class scene {
 
       g_materials.emplace_back(color, texture_index);
     }
-
-    _resources.material_buffer.getAllocation().copyFromMemory(g_materials.data(), 0, size);
+    _resources.material_buffer = host_buffer<gpu_material>(
+        vk_context, g_materials.size(), false, true
+    );
+    _resources.material_buffer.upload_data(vk_context, g_materials);
+    // _resources.material_buffer.getAllocation().copyFromMemory(g_materials.data(), 0, size);
   }
 
   void update_texture_descriptor(vulkan_context vk_context) {

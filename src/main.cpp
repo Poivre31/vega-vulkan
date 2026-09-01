@@ -19,7 +19,7 @@ class fps_layer final : public Ilayer {
 };
 
 int main() {
-  console::set_library_consoles_log_level(level::debug);
+  console::set_library_consoles_log_level(level::trace);
   application<> app("App");
   app.run();
   timer::print_all_elapsed_times(time_unit::millisecond);

@@ -4,7 +4,7 @@
 #include "context.hpp"
 
 vk::raii::CommandBuffer
-begin_single_command_buffer(vk::raii::CommandPool& command_pool, vk::raii::Device& device) {
+begin_transient_command_buffer(vk::raii::CommandPool& command_pool, vk::raii::Device& device) {
   vk::CommandBufferAllocateInfo command_buffer_info{
       .commandPool        = command_pool,
       .level              = vk::CommandBufferLevel::ePrimary,
@@ -21,8 +21,8 @@ begin_single_command_buffer(vk::raii::CommandPool& command_pool, vk::raii::Devic
   return std::move(command_buffer);
 }
 
-vk::raii::CommandBuffer begin_single_command_buffer(vulkan_context context) {
-  return begin_single_command_buffer(*context.command_pool, *context.device);
+vk::raii::CommandBuffer begin_transient_command_buffer(vulkan_context context) {
+  return begin_transient_command_buffer(*context.command_pool, *context.device);
 }
 
 void submit_single_command_buffer(

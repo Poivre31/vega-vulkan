@@ -32,7 +32,7 @@ constexpr auto color_space  = vk::ColorSpaceKHR::eSrgbNonlinear;
 
 constexpr uint32_t target_swapchain_image_count = 3;
 
-constexpr bool vsync = true;
+constexpr bool vsync = false;
 
 const std::string shader_path = "resources/shaders/lit_shader.spv";
 

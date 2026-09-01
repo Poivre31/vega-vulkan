@@ -26,6 +26,7 @@ target_sources(VegaVulkan PRIVATE
     "include/application/scene.hpp"
     "include/application/sdl.hpp"
 
+    "include/graphics/buffer.hpp"
     "include/graphics/config.hpp"
     "include/graphics/context.hpp"
     "include/graphics/gpu_objects.hpp"

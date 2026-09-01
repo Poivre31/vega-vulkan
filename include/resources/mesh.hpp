@@ -83,7 +83,7 @@ class mesh_3D {
     };
     vma::AllocationCreateInfo allocation_info{.usage = vma::MemoryUsage::eAutoPreferDevice};
     _buffer  = context.allocator->createBuffer(buffer_info, allocation_info);
-    auto cmd = begin_single_command_buffer(context);
+    auto cmd = begin_transient_command_buffer(context);
     cmd.copyBuffer(
         staging_buffer, _buffer, vk::BufferCopy{.srcOffset = 0, .dstOffset = 0, .size = size}
     );
