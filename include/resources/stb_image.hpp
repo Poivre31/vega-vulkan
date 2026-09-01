@@ -1,12 +1,12 @@
 #pragma once
 
 #include <stb_image.h>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <console/console.hpp>
 #include <timer/timer.hpp>
-
-enum class stb_channels : uint8_t { RGB = STBI_rgb, RGBA = STBI_rgb_alpha };
+#include "resources/texture_imports.hpp"
 
 using stb_image_ptr = std::unique_ptr<stbi_uc, decltype(&stbi_image_free)>;
 
@@ -28,11 +28,14 @@ class stb_image {
  public:
   stb_image() = default;
   stb_image(
-      const std::string& image_path,
-      stb_channels target_channels = stb_channels::RGBA,
-      bool silence                 = false
+      const std::string& texture_path,
+      channels target_channels = channels::RGBA,
+      bool silence             = false
   ) {
-    load(image_path, target_channels, silence);
+    load(texture_path, target_channels, silence);
+  }
+  stb_image(const texture_info& info, bool silence = false) {
+    load(info.texture_path, info.target_channels, silence);
   }
   stb_image(glm::vec4 color, uint32_t width, uint32_t height) {
     _data = stb_image_ptr(
@@ -64,11 +67,8 @@ class stb_image {
    * @param target_channels The channels you want in the loaded image, either RGB or RGBA
    *
    */
-  void load(
-      const std::string& image_path,
-      stb_channels target_channels = stb_channels::RGBA,
-      bool silence                 = false
-  ) noexcept {
+  void
+  load(const std::string& image_path, channels target_channels, bool silence = false) noexcept {
     auto timer = scoped_timer("image-loading");
     if (_image_loaded) {
       if (!silence) {
@@ -97,6 +97,16 @@ class stb_image {
         console::get(consoles::assets)
             ->trace("Loading image: found image at '{:s}'", path.string());
       }
+
+      if (target_channels != channels::RGBA) {
+        console::get(consoles::assets)
+            ->error(
+                "Only RGBA channels are supported for loaded images at this point (image file "
+                "have fewer channels, changing target to RGBA)"
+            );
+        target_channels = channels::RGBA;
+      }
+
       auto* image_data = stbi_load(
           path.string().data(),
           &_tex_width,
@@ -113,8 +123,8 @@ class stb_image {
         return;
       }
       _data         = stb_image_ptr(image_data, stbi_image_free);
-      _channels     = static_cast<int>(target_channels);
       _image_loaded = true;
+      _channels     = static_cast<int>(target_channels);
       _use_fallback = false;
       if (!silence) {
         console::get(consoles::assets)

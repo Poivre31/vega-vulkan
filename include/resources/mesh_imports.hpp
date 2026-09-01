@@ -1,6 +1,7 @@
 #pragma once
 
 #include "handle.hpp"
+#include <string>
 
 class mesh_3D;
 struct model_info {

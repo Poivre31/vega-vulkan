@@ -93,7 +93,7 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
   float4 albedo = inVert.material.albedo;
   if(inVert.material.texture_id!=-1U) { 
     albedo = textures[NonUniformResourceIndex(inVert.material.texture_id)]
-                        .Sample(float2(inVert.uv.x, 1 - inVert.uv.y));
+                        .Sample(float2(inVert.uv.x, 1-inVert.uv.y));
   }
   albedo.a = 1;
 

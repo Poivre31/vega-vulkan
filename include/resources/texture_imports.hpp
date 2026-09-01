@@ -1,9 +1,12 @@
 #pragma once
 
+enum class channels : uint8_t { RGB = 3, RGBA = 4 };
+
 struct texture_info {
   const char* texture_path{};
-  bool enable_mipmaps = true;
-  bool is_srgb        = true;
+  bool enable_mipmaps      = true;
+  bool is_srgb             = true;
+  channels target_channels = channels::RGBA;
 };
 
 // std::vector<handle<gpu_image>>

@@ -55,12 +55,12 @@ class assets_layer final : public Ilayer {
 
       // TEXTURES
       auto beer_tex = resources.textures.push(
-          std::move(load_texture_to_gpu(vk_context, stb_image(textures::beer.texture_path)))
+          std::move(load_texture_to_gpu(vk_context, stb_image(textures::beer)))
       );
       auto beer_mat = resources.materials.push(beer_tex);
 
       auto viking_tex = resources.textures.push(
-          std::move(load_texture_to_gpu(vk_context, stb_image(textures::viking.texture_path)))
+          std::move(load_texture_to_gpu(vk_context, stb_image(textures::viking)))
       );
       auto viking_mat = resources.materials.push(viking_tex);
 
@@ -69,7 +69,7 @@ class assets_layer final : public Ilayer {
       // scene.load_mesh_from_obj_mtl(vk_context, meshes::tyra);
       scene.load_mesh_from_obj_mtl(vk_context, meshes::sponza);
       // scene.load_mesh_from_obj_mtl(vk_context, meshes::tank);
-      // scene.load_vertex_array(create_cube({1.F, 0.F, 1.F}, 0.5F), beer_mat);
+      scene.load_vertex_array(create_cube({1.F, 0.F, 1.F}, 0.5F), beer_mat);
 
       for (auto& mesh : resources.meshes) {
         mesh.create_vertex_buffer(vk_context);
