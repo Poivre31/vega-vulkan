@@ -1,6 +1,8 @@
 #pragma once
-#include "glm.hpp"
+
 #include <console/console.hpp>
+
+#include "glm.hpp"
 
 enum class TrackingDirectionMode : uint8_t { ConstantDirection, LookAtPoint, LookAtObject };
 

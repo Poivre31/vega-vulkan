@@ -6,10 +6,10 @@
 #include <sys/types.h>
 #include <cstdint>
 #include <vector>
-#include "console/console.hpp"
-#include "layer.hpp"
-#include "timer/timer.hpp"
 #include <io.hpp>
+#include <console/console.hpp>
+
+#include "application/layer.hpp"
 
 // const char* const simple_shader =
 //     "RWStructuredBuffer<float> result;"

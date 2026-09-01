@@ -12,7 +12,7 @@ inline std::string read_file(const std::string& filename) {
     throw std::runtime_error("File " + filename + " failed to open");
   }
 
-  std::streamsize size = static_cast<std::streamsize>(file.tellg());
+  auto size = static_cast<std::streamsize>(file.tellg());
   std::string buffer(size, ' ');  //> Use current caracter position to find the size of the file
   file.seekg(0, std::ios::beg);   //> And return at file beginning
   file.read(buffer.data(), size);

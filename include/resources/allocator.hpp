@@ -1,4 +1,5 @@
 #pragma once
+
 #include <concepts>
 #include <cstdint>
 #include <memory>
@@ -6,7 +7,8 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
-#include "resources/handle.hpp"
+
+#include "handle.hpp"
 
 template <std::move_constructible T>
 class slot {

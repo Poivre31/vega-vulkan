@@ -1,10 +1,11 @@
 #pragma once
 
-#include "gpu_objects.hpp"
+#include "graphics/gpu_objects.hpp"
+#include "graphics/context.hpp"
+
 #include "tiny_obj_loader.h"
-#include "vulkan/context.hpp"
 #include "stb_image.hpp"
-#include "resources/handle.hpp"
+#include "handle.hpp"
 
 class material {
  public:

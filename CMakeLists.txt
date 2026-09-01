@@ -12,34 +12,38 @@ add_executable(VegaVulkan)
 target_sources(VegaVulkan PRIVATE
     "src/main.cpp"
 
-    "include/graphics.hpp"
     "include/glm.hpp"
-    "include/stb_image.hpp"
-    "include/sdl.hpp"
-    "include/layer.hpp"
-    "include/application.hpp"
-    "include/vulkan/vulkan_layer.hpp"
-    "include/camera.hpp"
-    "include/camera_class.hpp"
-    "include/primitive_meshes.hpp"
-    "include/vulkan/single_command_buffer.hpp"
-    "include/vulkan/buffer.hpp"
-    "include/mesh.hpp"
-    "include/assets.hpp"
-    "include/image.hpp"
-    "include/object_loader.hpp"
-    "include/global_config.hpp"
-    "include/slang_compiler.hpp"
     "include/io.hpp"
-    "include/resources/mesh_imports.hpp"
-    "include/resources/texture_imports.hpp"
-    "include/allocator.hpp"
-    "include/material.hpp"
-    "include/gpu_objects.hpp"
-    "include/scene.hpp"
-    "include/vulkan/context.hpp"
+
+    "include/application/application.hpp"
+    "include/application/config.hpp"
     "include/application/context.hpp"
+    "include/application/layer.hpp"
+    "include/application/scene.hpp"
+    "include/application/sdl.hpp"
+
+    "include/graphics/config.hpp"
+    "include/graphics/context.hpp"
+    "include/graphics/gpu_objects.hpp"
+    "include/graphics/graphics.hpp"
+    "include/graphics/image.hpp"
+    "include/graphics/single_command_buffer.hpp"
+    "include/graphics/slang_compiler.hpp"
+    "include/graphics/vulkan_layer.hpp"
+
+    "include/player/camera.hpp"
+    "include/player/camera_layer.hpp"
+
+    "include/resources/allocator.hpp"
+    "include/resources/assets.hpp"
     "include/resources/handle.hpp"
+    "include/resources/material.hpp"
+    "include/resources/mesh_imports.hpp"
+    "include/resources/mesh.hpp"
+    "include/resources/object_loader.hpp"
+    "include/resources/primitive_meshes.hpp"
+    "include/resources/stb_image.hpp"
+    "include/resources/texture_imports.hpp"
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 
@@ -47,7 +51,7 @@ add_subdirectory(vendor)
 
 target_compile_options(VegaVulkan PRIVATE -march=x86-64 -mtune=generic)
 
-target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics.hpp")
+target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics/graphics.hpp")
 
 target_link_libraries(VegaVulkan PRIVATE
     vendor

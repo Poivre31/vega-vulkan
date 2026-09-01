@@ -1,19 +1,19 @@
 #pragma once
-#include "layer.hpp"
-#include "graphics.hpp"
+
 #include <algorithm>
 #include <console/console.hpp>
 #include <SDL3/SDL_vulkan.h>
-#include "sdl.hpp"
-#include "timer/timer.hpp"
-#include "vk_mem_alloc_enums.hpp"
-#include "vulkan/vulkan.hpp"
-#include "vulkan/vulkan_raii.hpp"
-#include "vulkan/context.hpp"
-#include "vulkan/config.hpp"
+#include <timer/timer.hpp>
 #include <cstdint>
 #include <io.hpp>
-#include "image.hpp"
+
+#include "application/layer.hpp"
+#include "application/sdl.hpp"
+
+#include "graphics/image.hpp"
+#include "graphics.hpp"
+#include "context.hpp"
+#include "config.hpp"
 
 inline bool is_device_suitable(const vk::raii::PhysicalDevice& device) {
   auto device_properties = device.getProperties();

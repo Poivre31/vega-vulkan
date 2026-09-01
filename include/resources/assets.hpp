@@ -1,19 +1,17 @@
 #pragma once
 
 #include <vector>
-#include "glm/gtc/random.hpp"
-#include "image.hpp"
-#include "layer.hpp"
-#include "material.hpp"
-#include "mesh.hpp"
-#include "object_loader.hpp"  // IWYU pragma: keep
-#include "resources/mesh_imports.hpp"
+
+#include "graphics/context.hpp"
+#include "graphics/image.hpp"
+
+#include "application/scene.hpp"
+#include "application/layer.hpp"
+
+#include "mesh_imports.hpp"
 #include "primitive_meshes.hpp"  // IWYU pragma: keep
-#include "resources/texture_imports.hpp"
-#include "scene.hpp"
+#include "texture_imports.hpp"
 #include "stb_image.hpp"
-#include "vulkan/vulkan_raii.hpp"
-#include "vulkan/context.hpp"
 
 void update_texture_descriptor(vulkan_context vk_context, scene_resources& resources) {
   console::get(consoles::assets)

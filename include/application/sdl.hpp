@@ -5,10 +5,9 @@
 #include <SDL3/SDL_scancode.h>
 #include <console/console.hpp>
 #include <timer/timer.hpp>
-#include "layer.hpp"
-#include "global_config.hpp"
 
-const std::string texturePath = "beer.png";
+#include "layer.hpp"
+#include "config.hpp"
 
 struct sdl_exception : public std::runtime_error {
   using std::runtime_error::runtime_error;

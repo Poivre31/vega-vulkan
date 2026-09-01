@@ -1,14 +1,19 @@
 #pragma once
-#include "application/context.hpp"
-#include "layer.hpp"
-#include "sdl.hpp"
-#include "camera.hpp"
-#include "vulkan/vulkan_layer.hpp"
-#include "slang_compiler.hpp"
-#include "assets.hpp"
+
 #include <console/console.hpp>
 #include <concepts>
 #include <queue>
+
+#include "context.hpp"
+#include "graphics/vulkan_layer.hpp"
+#include "graphics/slang_compiler.hpp"
+
+#include "player/camera_layer.hpp"
+
+#include "resources/assets.hpp"
+
+#include "layer.hpp"
+#include "sdl.hpp"
 
 template <class T>
 concept application_layer = std::derived_from<T, Ilayer> && std::is_final_v<T>;

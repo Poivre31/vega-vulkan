@@ -1,5 +1,7 @@
 #pragma once
 
+#include "graphics.hpp"
+
 namespace vulkan_config {
 
 const vk::ApplicationInfo vulkan_info{

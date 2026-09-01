@@ -1,5 +1,5 @@
 #include <console/console.hpp>
-#include "application.hpp"
+#include "application/application.hpp"
 #include "timer/timer.hpp"
 
 class fps_layer final : public Ilayer {

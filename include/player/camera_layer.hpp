@@ -1,7 +1,10 @@
 #pragma once
-#include "layer.hpp"
-#include "camera_class.hpp"
+
 #include <console/console.hpp>
+
+#include "application/layer.hpp"
+
+#include "camera.hpp"
 
 class camera_layer final : public Ilayer {
  public:

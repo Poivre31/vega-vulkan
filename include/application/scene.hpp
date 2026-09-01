@@ -2,17 +2,21 @@
 
 #include <cstdint>
 #include <stdexcept>
-#include "allocator.hpp"
+
+#include "glm.hpp"
+
 #include "glm/gtc/random.hpp"
-#include "gpu_objects.hpp"
-#include "mesh.hpp"
+#include "resources/allocator.hpp"
+#include "resources/mesh.hpp"
 #include "resources/handle.hpp"
-#include "vulkan/context.hpp"
-#include "material.hpp"
-#include "vulkan/config.hpp"
+#include "resources/material.hpp"
 #include "resources/mesh_imports.hpp"
-#include "object_loader.hpp"
-#include "image.hpp"
+#include "resources/object_loader.hpp"
+
+#include "graphics/image.hpp"
+#include "graphics/context.hpp"
+#include "graphics/config.hpp"
+#include "graphics/gpu_objects.hpp"
 
 struct scene_resources {
   static_allocator<mesh_3D> meshes;

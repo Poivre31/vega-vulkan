@@ -1,9 +1,12 @@
 #pragma once
 
-#include "scene.hpp"
-#include "camera_class.hpp"
-#include "vulkan/context.hpp"
-#include "SDL3/SDL.h"
+#include <SDL3/SDL.h>
+
+#include "application/scene.hpp"
+
+#include "player/camera.hpp"
+
+#include "graphics/context.hpp"
 
 struct application_context {
   SDL_Window* window = nullptr;

@@ -1,7 +1,6 @@
 #pragma once
 
-#include <stb_image.h>  // IWYU pragma: export
-
+#include <stb_image.h>
 #include <filesystem>
 #include <memory>
 #include <console/console.hpp>

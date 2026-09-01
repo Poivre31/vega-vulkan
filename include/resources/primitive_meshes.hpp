@@ -1,7 +1,5 @@
 #pragma once
-#include <cstdint>
-#include "image.hpp"
-#include "material.hpp"
+
 #include "mesh.hpp"
 
 template <typename T>

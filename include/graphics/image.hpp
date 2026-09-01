@@ -1,10 +1,11 @@
 #pragma once
 
+#include "resources/stb_image.hpp"
+
 #include "graphics.hpp"
-#include "stb_image.hpp"
-#include "vulkan/buffer.hpp"
-#include "vulkan/single_command_buffer.hpp"
+#include "single_command_buffer.hpp"
 #include "gpu_objects.hpp"
+#include "context.hpp"
 
 void transition_image_layout(
     const vk::Image& image,

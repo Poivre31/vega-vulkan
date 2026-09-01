@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
+
 #include "application/context.hpp"
 
 bool is_context_valid(application_context& context) {
