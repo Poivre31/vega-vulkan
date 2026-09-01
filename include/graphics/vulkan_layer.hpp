@@ -142,7 +142,6 @@ class vulkan_layer final : public Ilayer {
       create_graphics_pipeline();
       create_command_pool();
       create_depth_resources();
-      create_texture_sampler();
       create_descriptor_pools();
       create_descriptor_sets();
       create_command_buffer();
@@ -794,43 +793,19 @@ class vulkan_layer final : public Ilayer {
         vk::ImageAspectFlagBits::eDepth
     );
     auto cmd = begin_transient_command_buffer(_command_pool, _device);
-    transition_image_layout(
-        *_depth_image.image,
+    transition_image_global_layout(
+        _depth_image,
         cmd,
-        vk::ImageLayout::eUndefined,
         vk::ImageLayout::eDepthAttachmentOptimal,
         vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
         vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
         vk::PipelineStageFlagBits2::eEarlyFragmentTests
             | vk::PipelineStageFlagBits2::eLateFragmentTests,
         vk::PipelineStageFlagBits2::eEarlyFragmentTests
-            | vk::PipelineStageFlagBits2::eLateFragmentTests,
-        vk::ImageAspectFlagBits::eDepth
+            | vk::PipelineStageFlagBits2::eLateFragmentTests
     );
+
     submit_single_command_buffer(_graphics_queue, std::move(cmd));
-  }
-
-  void create_texture_sampler() {
-    auto properties = _physical_device.getProperties();
-    vk::SamplerCreateInfo sampler_info{
-        .magFilter               = vk::Filter::eNearest,
-        .minFilter               = vk::Filter::eNearest,
-        .mipmapMode              = vk::SamplerMipmapMode::eNearest,
-        .addressModeU            = vk::SamplerAddressMode::eRepeat,
-        .addressModeV            = vk::SamplerAddressMode::eRepeat,
-        .addressModeW            = vk::SamplerAddressMode::eRepeat,
-        .mipLodBias              = 0.0F,
-        .anisotropyEnable        = vk::True,
-        .maxAnisotropy           = properties.limits.maxSamplerAnisotropy,
-        .compareEnable           = vk::False,
-        .compareOp               = vk::CompareOp::eAlways,
-        .minLod                  = 0.0F,
-        .maxLod                  = 0.0F,
-        .borderColor             = vk::BorderColor::eIntOpaqueBlack,
-        .unnormalizedCoordinates = vk::False
-    };
-
-    _image_sampler = vk::raii::Sampler(_device, sampler_info);
   }
 
   void create_descriptor_pools() {
@@ -1107,8 +1082,6 @@ class vulkan_layer final : public Ilayer {
   vk::raii::CommandPool _command_pool = nullptr;
 
   gpu_image _depth_image;
-
-  vk::raii::Sampler _image_sampler = nullptr;
 
   vk::raii::DescriptorSetLayout _descriptor_set_layout = nullptr;
   vk::raii::DescriptorPool _descriptor_pool            = nullptr;

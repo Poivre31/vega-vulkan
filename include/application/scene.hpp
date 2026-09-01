@@ -20,8 +20,11 @@ struct scene_resources {
   static_allocator<mesh_3D> meshes;
   static_allocator<material> materials;
   static_allocator<gpu_image> textures;
-  vk::raii::Sampler sampler                 = nullptr;
-  // vma::raii::Buffer material_buffer = nullptr;
+  // vk::raii::Sampler sampler_nearest = nullptr;
+  // vk::raii::Sampler sampler_linear  = nullptr;
+  simple_sampler nearest_sampler = nullptr;
+  simple_sampler linear_sampler  = nullptr;
+
   host_buffer<gpu_material> material_buffer = nullptr;
 
   handle<gpu_image> fallback_tex;
@@ -39,28 +42,15 @@ class scene {
   scene& operator=(scene&&)      = delete;
 
   void init(vulkan_context vk_context) {
-    auto properties = vk_context.physical_device->getProperties();
-    vk::SamplerCreateInfo sampler_info{
-        .magFilter               = vk::Filter::eNearest,
-        .minFilter               = vk::Filter::eNearest,
-        .mipmapMode              = vk::SamplerMipmapMode::eNearest,
-        .addressModeU            = vk::SamplerAddressMode::eRepeat,
-        .addressModeV            = vk::SamplerAddressMode::eRepeat,
-        .addressModeW            = vk::SamplerAddressMode::eRepeat,
-        .mipLodBias              = 0.0F,
-        .anisotropyEnable        = vk::True,
-        .maxAnisotropy           = properties.limits.maxSamplerAnisotropy,
-        .compareEnable           = vk::False,
-        .compareOp               = vk::CompareOp::eAlways,
-        .minLod                  = 0.0F,
-        .maxLod                  = 0.0F,
-        .borderColor             = vk::BorderColor::eIntOpaqueBlack,
-        .unnormalizedCoordinates = vk::False
-    };
-    _resources.sampler = vk::raii::Sampler(*vk_context.device, sampler_info);
+    _resources.nearest_sampler = simple_sampler(
+        vk_context, false, vk::SamplerAddressMode::eRepeat, 0.F
+    );
+    _resources.linear_sampler = simple_sampler(
+        vk_context, true, vk::SamplerAddressMode::eRepeat, 0.F
+    );
 
     auto fallback_tex = _resources.textures.push(
-        std::move(load_texture_to_gpu(vk_context, stb_image()))
+        std::move(load_texture_to_gpu(vk_context, stb_image(), _resources.nearest_sampler))
     );
     _resources.default_mat = _resources.materials.push(glm::vec4(1.F));
 
@@ -71,6 +61,17 @@ class scene {
   [[nodiscard]] auto* meshes() { return &_resources.meshes; }
   [[nodiscard]] auto* materials() { return &_resources.materials; }
   [[nodiscard]] auto* textures() { return &_resources.textures; }
+
+  handle<gpu_image> load_texture(vulkan_context& vk_context, const texture_info& info) {
+    stb_image cpu_texture(info);
+    return _resources.textures.push(
+        std::move(load_texture_to_gpu(
+            vk_context,
+            std::move(cpu_texture),
+            info.enable_mipmaps ? _resources.linear_sampler : _resources.nearest_sampler
+        ))
+    );
+  }
 
   /** Should be followed by a call to 'update_texture_descriptor(app_context*)' */
   handle<mesh_3D> load_mesh_from_obj_mtl(vulkan_context vk_context, const model_info& info) {
@@ -92,7 +93,9 @@ class scene {
             texture = stb_image(info.object_folder + mat.diffuse_texname);
 
             auto texture_handle = _resources.textures.push(
-                std::move(load_texture_to_gpu(vk_context, std::move(texture)))
+                std::move(
+                    load_texture_to_gpu(vk_context, std::move(texture), _resources.linear_sampler)
+                )
             );
 
             material_handle = _resources.materials.push(color, texture_handle);
@@ -206,7 +209,7 @@ class scene {
     image_descriptors.reserve(_resources.textures.size());
     for (auto& texture : _resources.textures) {
       vk::DescriptorImageInfo image_info{
-          .sampler     = _resources.sampler,
+          .sampler     = *texture.sampler,
           .imageView   = texture.view,
           .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
       };
@@ -230,7 +233,8 @@ class scene {
     _resources.meshes.clear();
     _resources.materials.clear();
     _resources.textures.clear();
-    _resources.sampler         = nullptr;
+    _resources.nearest_sampler = nullptr;
+    _resources.linear_sampler  = nullptr;
     _resources.material_buffer = nullptr;
   }
 

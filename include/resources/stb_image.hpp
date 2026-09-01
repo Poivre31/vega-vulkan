@@ -30,11 +30,11 @@ class stb_image {
   stb_image(
       const std::string& texture_path,
       channels target_channels = channels::RGBA,
-      bool silence             = false
+      bool silence             = true
   ) {
     load(texture_path, target_channels, silence);
   }
-  stb_image(const texture_info& info, bool silence = false) {
+  stb_image(const texture_info& info, bool silence = true) {
     load(info.texture_path, info.target_channels, silence);
   }
   stb_image(glm::vec4 color, uint32_t width, uint32_t height) {
@@ -67,8 +67,7 @@ class stb_image {
    * @param target_channels The channels you want in the loaded image, either RGB or RGBA
    *
    */
-  void
-  load(const std::string& image_path, channels target_channels, bool silence = false) noexcept {
+  void load(const std::string& image_path, channels target_channels, bool silence = true) noexcept {
     auto timer = scoped_timer("image-loading");
     if (_image_loaded) {
       if (!silence) {
@@ -126,15 +125,13 @@ class stb_image {
       _image_loaded = true;
       _channels     = static_cast<int>(target_channels);
       _use_fallback = false;
-      if (!silence) {
-        console::get(consoles::assets)
-            ->trace(
-                "Loading image: succesfully loaded image '{:s}' of size ({}, {})",
-                image_path,
-                _tex_width,
-                _tex_height
-            );
-      }
+      console::get(consoles::assets)
+          ->trace(
+              "Loading image: succesfully loaded image '{:s}' of size ({}, {})",
+              image_path,
+              _tex_width,
+              _tex_height
+          );
     } catch (const std::filesystem::filesystem_error& e) {
       console::get(consoles::assets)
           ->error("Filesystem error loading image '{}': {}", image_path, e.what());

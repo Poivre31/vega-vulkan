@@ -35,6 +35,7 @@ target_sources(VegaVulkan PRIVATE
     "include/graphics/single_command_buffer.hpp"
     "include/graphics/slang_compiler.hpp"
     "include/graphics/vulkan_layer.hpp"
+    "include/graphics/image_layout.hpp"
 
     "include/player/camera.hpp"
     "include/player/camera_layer.hpp"

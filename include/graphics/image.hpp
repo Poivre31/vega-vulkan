@@ -2,44 +2,111 @@
 
 #include "resources/stb_image.hpp"
 
-#include "graphics.hpp"
+#include "image_layout.hpp"
 #include "single_command_buffer.hpp"
-#include "gpu_objects.hpp"
 #include "context.hpp"
 
-void transition_image_layout(
-    const vk::Image& image,
-    vk::raii::CommandBuffer& command_buffer,
-    vk::ImageLayout old_layout,
-    vk::ImageLayout new_layout,
-    vk::AccessFlags2 src_access_mask,
-    vk::AccessFlags2 dst_access_mask,
-    vk::PipelineStageFlags2 src_stage_mask,
-    vk::PipelineStageFlags2 dst_stage_mask,
-    vk::ImageAspectFlags aspect
+class simple_sampler {
+ public:
+  simple_sampler(std::nullptr_t) {}
+  simple_sampler(
+      vulkan_context& vk_context,
+      bool linear_filtering,
+      vk::SamplerAddressMode adress_mode,
+      float mip_lod_bias
+  )
+      : _linear_filtering(linear_filtering),
+        _adress_mode(adress_mode),
+        _mip_lod_bias(mip_lod_bias) {
+    auto properties = vk_context.physical_device->getProperties();
+    vk::SamplerCreateInfo sampler_info{
+        .magFilter        = linear_filtering ? vk::Filter::eLinear : vk::Filter::eNearest,
+        .minFilter        = linear_filtering ? vk::Filter::eLinear : vk::Filter::eNearest,
+        .mipmapMode       = linear_filtering ? vk::SamplerMipmapMode::eLinear
+                                             : vk::SamplerMipmapMode::eNearest,
+        .addressModeU     = adress_mode,
+        .addressModeV     = adress_mode,
+        .addressModeW     = adress_mode,
+        .mipLodBias       = _mip_lod_bias,
+        .anisotropyEnable = vk::True,
+        .maxAnisotropy    = properties.limits.maxSamplerAnisotropy,
+        .minLod           = 0.0F,
+        .maxLod           = linear_filtering ? vk::LodClampNone : 0.F,
+        .borderColor      = vk::BorderColor::eIntOpaqueBlack,
+    };
+    _sampler = vk::raii::Sampler(*vk_context.device, sampler_info);
+  }
+
+  [[nodiscard]] bool is_using_linear_filtering() const { return _linear_filtering; }
+  [[nodiscard]] vk::raii::Sampler& get() { return _sampler; }
+
+ private:
+  vk::raii::Sampler _sampler = nullptr;
+  bool _linear_filtering{};
+  vk::SamplerAddressMode _adress_mode{};
+  float _mip_lod_bias = 0.F;
+};
+
+void generate_mip_maps(
+    vulkan_context& vk_context,
+    vk::raii::CommandBuffer& cmd,
+    gpu_image& texture
 ) {
-  vk::ImageMemoryBarrier2 barrier = {
-      .srcStageMask        = src_stage_mask,
-      .srcAccessMask       = src_access_mask,
-      .dstStageMask        = dst_stage_mask,
-      .dstAccessMask       = dst_access_mask,
-      .oldLayout           = old_layout,
-      .newLayout           = new_layout,
-      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-      .image               = image,
-      .subresourceRange    = {
-          .aspectMask     = aspect,
-          .baseMipLevel   = 0,
-          .levelCount     = 1,
-          .baseArrayLayer = 0,
-          .layerCount     = 1
-      }
-  };
-  vk::DependencyInfo dependency_info = {
-      .dependencyFlags = {}, .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier
-  };
-  command_buffer.pipelineBarrier2(dependency_info);
+  auto format_properties = vk_context.physical_device->getFormatProperties(texture.format);
+  if (!(format_properties.optimalTilingFeatures
+        & vk::FormatFeatureFlagBits::eSampledImageFilterLinear)) {
+    throw std::runtime_error(
+        "Choosed image format doesn't support linear filtering necessary to generate mipmaps"
+    );
+  }
+  if (texture.layout != vk::ImageLayout::eTransferDstOptimal) {
+    throw std::runtime_error(
+        "All mip maps have to be in transfer dst optimal layout before mipmap generation"
+    );
+  }
+  texture.mip_level_count =
+      static_cast<uint32_t>(std::floor(std::log2(std::max(texture.width, texture.height)))) + 1;
+
+  uint32_t mip_width  = texture.width;
+  uint32_t mip_height = texture.height;
+
+  for (uint32_t mip_level = 1; mip_level < texture.mip_level_count; mip_level++) {
+    transition_image_mip_layout(texture, cmd, layout_transition::dst_to_src, mip_level - 1);
+    vk::ImageBlit blit = {
+        .srcSubresource =
+            {.aspectMask = texture.aspect, .mipLevel = mip_level - 1, .layerCount = 1},
+        .srcOffsets = std::array<vk::Offset3D, 2>(
+            {{},
+             {.x = static_cast<int32_t>(mip_width), .y = static_cast<int32_t>(mip_height), .z = 1}}
+        ),
+        .dstSubresource = {.aspectMask = texture.aspect, .mipLevel = mip_level, .layerCount = 1},
+        .dstOffsets     = std::array<vk::Offset3D, 2>(
+            {{},
+             {.x = std::max(static_cast<int32_t>(mip_width / 2), 1),
+              .y = std::max(static_cast<int32_t>(mip_height / 2), 1),
+              .z = 1}}
+        ),
+    };
+
+    cmd.blitImage(
+        texture.image,
+        vk::ImageLayout::eTransferSrcOptimal,
+        texture.image,
+        vk::ImageLayout::eTransferDstOptimal,
+        blit,
+        vk::Filter::eLinear
+    );
+
+    transition_image_mip_layout(texture, cmd, layout_transition::src_to_shader_read, mip_level - 1);
+
+    mip_width  = std::max(mip_width / 2, 1U);
+    mip_height = std::max(mip_height / 2, 1U);
+  }
+  transition_image_mip_layout(
+      texture, cmd, layout_transition::dst_to_shader_read, texture.mip_level_count - 1
+  );
+
+  texture.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
 }
 
 gpu_image create_image(
@@ -49,17 +116,18 @@ gpu_image create_image(
     uint32_t width,
     uint32_t height,
     vk::ImageUsageFlags usage,
-    vk::ImageAspectFlags aspect
+    vk::ImageAspectFlags aspect,
+    uint32_t mip_level_count = 1
 ) {
   vk::ImageCreateInfo image_info{
       .imageType   = vk::ImageType::e2D,
       .format      = format,
       .extent      = {.width = width, .height = height, .depth = 1},
-      .mipLevels   = 1,
+      .mipLevels   = mip_level_count,
       .arrayLayers = 1,
       .samples     = vk::SampleCountFlagBits::e1,
       .tiling      = vk::ImageTiling::eOptimal,
-      .usage       = usage,
+      .usage = usage | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst,
       .sharingMode = vk::SharingMode::eExclusive
   };
   vma::AllocationCreateInfo allocation_info{.usage = vma::MemoryUsage::eAutoPreferDevice};
@@ -72,17 +140,29 @@ gpu_image create_image(
       .subresourceRange = {
           .aspectMask     = aspect,
           .baseMipLevel   = 0,
-          .levelCount     = 1,
+          .levelCount     = mip_level_count,
           .baseArrayLayer = 0,
           .layerCount     = 1
       }
   };
   auto view = vk::raii::ImageView(device, view_info);
 
-  return {.image = std::move(image), .view = std::move(view)};
+  return {
+      .image           = std::move(image),
+      .view            = std::move(view),
+      .width           = width,
+      .height          = height,
+      .format          = format,
+      .aspect          = aspect,
+      .layout          = vk::ImageLayout::eUndefined,
+      .mip_level_count = mip_level_count,
+  };
 }
 
-gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image&& cpu_texture) {
+gpu_image
+load_texture_to_gpu(vulkan_context& vk_context, stb_image&& cpu_texture, simple_sampler& sampler) {
+  bool mip_maps = sampler.is_using_linear_filtering();
+
   stb_image texture = std::move(cpu_texture);
   uint64_t size     = texture.byte_size();
   vk::BufferCreateInfo staging_buffer_info{
@@ -95,33 +175,38 @@ gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image&& cpu_tex
                | vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
       .usage = vma::MemoryUsage::eAutoPreferHost
   };
-  auto staging_buffer = context.allocator->createBuffer(
+  auto staging_buffer = vk_context.allocator->createBuffer(
       staging_buffer_info, staging_allocation_info
   );
   staging_buffer.getAllocation().copyFromMemory(texture.data(), 0, size);
 
+  uint32_t mip_level_count = mip_maps ? static_cast<uint32_t>(std::floor(
+                                            std::log2(std::max(texture.width(), texture.height()))
+                                        )) + 1
+                                      : 1;
+
   auto image = create_image(
-      *context.allocator,
-      *context.device,
+      *vk_context.allocator,
+      *vk_context.device,
       vk::Format::eR8G8B8A8Srgb,
       texture.width(),
       texture.height(),
-      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-      vk::ImageAspectFlagBits::eColor
+      vk::ImageUsageFlagBits::eSampled,
+      vk::ImageAspectFlagBits::eColor,
+      mip_level_count
   );
 
-  auto cmd = begin_transient_command_buffer(context);
-  transition_image_layout(
-      image.image,
+  auto cmd = begin_transient_command_buffer(vk_context);
+  transition_image_global_layout(
+      image,
       cmd,
-      vk::ImageLayout::eUndefined,
       vk::ImageLayout::eTransferDstOptimal,
       {},
       vk::AccessFlagBits2::eTransferRead,
       vk::PipelineStageFlagBits2::eTopOfPipe,
-      vk::PipelineStageFlagBits2::eTransfer,
-      vk::ImageAspectFlagBits::eColor
+      vk::PipelineStageFlagBits2::eTransfer
   );
+
   cmd.copyBufferToImage(
       staging_buffer,
       image.image,
@@ -136,17 +221,19 @@ gpu_image load_texture_to_gpu(const vulkan_context& context, stb_image&& cpu_tex
           }
       }}
   );
-  transition_image_layout(
-      image.image,
-      cmd,
-      vk::ImageLayout::eTransferDstOptimal,
-      vk::ImageLayout::eShaderReadOnlyOptimal,
-      vk::AccessFlagBits2::eTransferWrite,
-      vk::AccessFlagBits2::eShaderRead,
-      vk::PipelineStageFlagBits2::eTransfer,
-      vk::PipelineStageFlagBits2::eFragmentShader,
-      vk::ImageAspectFlagBits::eColor
-  );
-  submit_single_command_buffer(context, std::move(cmd));
+  if (mip_maps) {
+    generate_mip_maps(vk_context, cmd, image);
+  }
+  //   transition_image_global_layout(
+  //       image,
+  //       cmd,
+  //       vk::ImageLayout::eTransferDstOptimal,
+  //       {},
+  //       vk::AccessFlagBits2::eTransferRead,
+  //       vk::PipelineStageFlagBits2::eTopOfPipe,
+  //       vk::PipelineStageFlagBits2::eTransfer
+  //   );
+  submit_single_command_buffer(vk_context, std::move(cmd));
+  image.sampler = &sampler.get();
   return std::move(image);
 }

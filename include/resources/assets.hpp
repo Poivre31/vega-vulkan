@@ -13,35 +13,6 @@
 #include "texture_imports.hpp"
 #include "stb_image.hpp"
 
-void update_texture_descriptor(vulkan_context vk_context, scene_resources& resources) {
-  console::get(consoles::assets)
-      ->warn(
-          "TO DO: move to a fixed size arena for textures and make it efficient to update "
-          "descriptors"
-      );
-  std::vector<vk::DescriptorImageInfo> image_descriptors;
-  for (auto& texture : resources.textures) {
-    vk::DescriptorImageInfo image_info{
-        .sampler     = resources.sampler,
-        .imageView   = texture.view,
-        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-    };
-    image_descriptors.push_back(image_info);
-  }
-
-  for (uint32_t i = 0; i < vulkan_config::frames_in_flight; i++) {
-    vk::WriteDescriptorSet write_descriptor_set{
-        .dstSet          = vk_context.descriptor_sets->at(i),
-        .dstBinding      = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = static_cast<uint32_t>(image_descriptors.size()),
-        .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
-        .pImageInfo      = image_descriptors.data()
-    };
-    vk_context.device->updateDescriptorSets(write_descriptor_set, {});
-  }
-}
-
 class assets_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
@@ -54,14 +25,10 @@ class assets_layer final : public Ilayer {
       scene.init(vk_context);
 
       // TEXTURES
-      auto beer_tex = resources.textures.push(
-          std::move(load_texture_to_gpu(vk_context, stb_image(textures::beer)))
-      );
+      auto beer_tex = scene.load_texture(vk_context, textures::beer);
       auto beer_mat = resources.materials.push(beer_tex);
 
-      auto viking_tex = resources.textures.push(
-          std::move(load_texture_to_gpu(vk_context, stb_image(textures::viking)))
-      );
+      auto viking_tex = scene.load_texture(vk_context, textures::viking);
       auto viking_mat = resources.materials.push(viking_tex);
 
       // MODELS

@@ -19,8 +19,8 @@ struct Material {
 // uniform StructuredBuffer<Material>.Handle materials;
 
 static float3 light_dir     = float3(-0.2, -0.3, -1);
-static float4 light_color   = float4(1., 0.8, 0.6,1);
-static float4 ambient_color = float4(0.03, 0.08, 0.2,1);
+static float4 light_color   = float4(1., 0.8, 0.6, 1);
+static float4 ambient_color = float4(0.03, 0.08, 0.2, 1);
 
 struct VSInput {
   float3 position;
@@ -59,10 +59,10 @@ float3 randFloat3(float a, float b, uint seed) {
 [shader("vertex")]
 VertexOutput vertMain(VSInput vertex) {
   VertexOutput output;
-  output.position    = float4(vertex.position, 1);
-  output.position    = mul(push_constants.view_projection_matrix, output.position);
-  output.normal      = vertex.normal;
-  output.uv          = vertex.uv;
+  output.position = float4(vertex.position, 1);
+  output.position = mul(push_constants.view_projection_matrix, output.position);
+  output.normal   = vertex.normal;
+  output.uv       = vertex.uv;
   // if(vertex.material_id<push_constants.material_count) {
   //   output.material = Material(float3(0,0,1),0);
   // } else {
@@ -86,17 +86,19 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
   float intensity = clamp(dot(inVert.normal, -light_dir) / dot(light_dir, light_dir), 0, 1);
   float4 light    = intensity * light_color + ambient_color;
 
-  if(inVert.material.texture_id>=push_constants.material_count && inVert.material.texture_id!=-1U) {
-    return float4(0,1,0,1);
+  if (inVert.material.texture_id >= push_constants.material_count
+      && inVert.material.texture_id != -1U) {
+    return float4(0, 1, 0, 1);
   }
 
   float4 albedo = inVert.material.albedo;
-  if(inVert.material.texture_id!=-1U) { 
-    albedo = textures[NonUniformResourceIndex(inVert.material.texture_id)]
-                        .Sample(float2(inVert.uv.x, 1-inVert.uv.y));
+  if (inVert.material.texture_id != -1U) {
+    albedo = textures[NonUniformResourceIndex(inVert.material.texture_id)].Sample(
+        float2(inVert.uv.x, 1 - inVert.uv.y)
+    );
   }
   albedo.a = 1;
 
-  return albedo*light;
+  return albedo * light;
   // return float4(inVert.uv, 0.5 + 0.5 * sin(3.14 * push_constants.time / 2), 1);
 }
