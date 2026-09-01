@@ -4,6 +4,7 @@
 #include <utility>
 #include <timer/timer.hpp>
 
+#include "resources/primitive_meshes.hpp"
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
 
@@ -18,12 +19,12 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
       if (!std::filesystem::exists(path)) {
         console::get(consoles::assets)
             ->error(
-                "Model '{}' doesn't exist in directory '{}' or '{}', error",
+                "Model '{}' doesn't exist in directory '{}' or '{}', loading default cube",
                 model_path,
                 std::filesystem::current_path().string(),
                 std::filesystem::absolute("resources/models/").string()
             );
-        std::abort();
+        return {create_cube({0.F, 0.F, 0.F}, 1.F), {}};
       }
     }
     if (!silence) {
@@ -40,21 +41,14 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
     config.num_threads = -1;
 
     bool ok = tinyobj::LoadObjOpt(
-        &attrib,
-        &shapes,
-        &materials,
-        &warn,
-        &err,
-        model_path.data(),
-        /* mtl_basedir */ nullptr,
-        config
+        &attrib, &shapes, &materials, &warn, &err, model_path.data(), nullptr, config
     );
     if (!warn.empty()) {
       console::get(consoles::assets)->warn("Tinyobj loader warning : {}", warn);
     }
     if (!ok) {
-      console::get(consoles::assets)->warn("Tinyobj loader error : {}", err);
-      std::abort();
+      console::get(consoles::assets)->warn("Tinyobj loader error, loading default cube : {}", err);
+      return {create_cube({0.F, 0.F, 0.F}, 1.F), {}};
     }
 
     std::vector<vertex_3D> vertices;
@@ -113,7 +107,6 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
           }
         }
         vertices.insert(vertices.end(), face_vertices.begin(), face_vertices.end());
-        // shapes[s].mesh.material_ids[f];
       }
     }
 
@@ -121,10 +114,14 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
 
   } catch (const std::filesystem::filesystem_error& e) {
     console::get(consoles::assets)
-        ->error("Filesystem error loading model '{}': {}", model_path, e.what());
+        ->error(
+            "Filesystem error loading model, loading default cube '{}': {}", model_path, e.what()
+        );
   } catch (const std::exception& e) {
     console::get(consoles::assets)
-        ->error("Unexpected error loading model'{}': {}", model_path, e.what());
+        ->error(
+            "Unexpected error loading model, loading default cube '{}': {}", model_path, e.what()
+        );
   }
-  std::abort();
+  return {create_cube({0.F, 0.F, 0.F}, 1.F), {}};
 }
