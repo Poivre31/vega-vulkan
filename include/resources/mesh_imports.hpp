@@ -13,6 +13,13 @@ struct model_info {
 
 namespace meshes {
 
+const model_info viking{
+    .object_folder = "resources/models/",
+    .mesh_name     = "viking_room.obj",
+    .scale         = 1.F,
+    .z_is_up       = true,
+};
+
 const model_info tank{
     .object_folder = "resources/models/t34/",
     .mesh_name     = "t34.obj",

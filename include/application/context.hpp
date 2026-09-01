@@ -37,7 +37,7 @@ struct application_context {
   //   resources_data resources;
   scene active_scene;
 
-  std::vector<std::vector<uint32_t>> shader_modules;
+  std::vector<std::vector<char>> shader_modules;
   bool recompile_shaders    = false;
   bool frame_buffer_resized = false;
 };

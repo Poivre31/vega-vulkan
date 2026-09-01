@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <fstream>
+#include <console/console.hpp>
 
 inline std::string read_file(const std::string& filename) {
   std::ifstream file(
@@ -13,10 +14,12 @@ inline std::string read_file(const std::string& filename) {
   }
 
   auto size = static_cast<std::streamsize>(file.tellg());
-  std::string buffer(size, ' ');  //> Use current caracter position to find the size of the file
-  file.seekg(0, std::ios::beg);   //> And return at file beginning
+  std::string buffer(size + 1, '\0');
+  file.seekg(0, std::ios::beg);
   file.read(buffer.data(), size);
   file.close();
+
+  console::get(consoles::assets)->trace("Succesfully loaded file {}", filename);
 
   return buffer;
 }

@@ -646,7 +646,7 @@ class vulkan_layer final : public Ilayer {
 
     vk::ShaderModuleCreateInfo shader_module_info{
         .codeSize = get_app_context()->shader_modules[0].size(),
-        .pCode    = get_app_context()->shader_modules[0].data()
+        .pCode    = reinterpret_cast<uint32_t*>(get_app_context()->shader_modules[0].data())
     };
     vk::raii::ShaderModule shader_module(_device, shader_module_info);
 

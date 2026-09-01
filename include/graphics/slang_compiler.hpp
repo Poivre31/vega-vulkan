@@ -4,6 +4,7 @@
 #include <slang-com-ptr.h>
 #include <slang-com-helper.h>
 #include <sys/types.h>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 #include <io.hpp>
@@ -127,7 +128,7 @@ class slang_layer final : public Ilayer {
       const char* module_name = "simple";
       const char* module_path = "simple.slang";
       slang_module            = _session->loadModuleFromSourceString(
-          module_name, module_path, simple_shader.data(), diagnostics.writeRef()
+          module_name, module_path, simple_shader.c_str(), diagnostics.writeRef()
       );
       diagnose_if_needed(diagnostics);
       if (!slang_module) {
@@ -201,11 +202,11 @@ class slang_layer final : public Ilayer {
 
     get_app_context()->shader_modules.clear();
     get_app_context()->shader_modules.emplace_back(
-        reinterpret_cast<const uint32_t*>(spirv_code->getBufferPointer()),
-        reinterpret_cast<const uint32_t*>(spirv_code->getBufferPointer())
-            + spirv_code->getBufferSize()
+        reinterpret_cast<const char*>(spirv_code->getBufferPointer()),
+        reinterpret_cast<const char*>(spirv_code->getBufferPointer()) + spirv_code->getBufferSize()
     );
 
+    _console->info("Successfully loaded, compiled and linked shaders");
     return true;
   }
 

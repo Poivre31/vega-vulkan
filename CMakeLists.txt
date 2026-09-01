@@ -5,9 +5,13 @@ project(VegaVulkan)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS_DEBUG "-O2")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")
 
 add_executable(VegaVulkan)
+
+# target_compile_options(VegaVulkan PRIVATE -fsanitize=address)
+# target_link_options(VegaVulkan PRIVATE -fsanitize=address)
 
 target_sources(VegaVulkan PRIVATE
     "src/main.cpp"

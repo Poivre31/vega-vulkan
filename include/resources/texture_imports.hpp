@@ -26,4 +26,9 @@ const texture_info beer{
     .enable_mipmaps = false,  // MOVE TO SAMPLER SETTING
 };
 
+const texture_info viking{
+    .texture_path   = "resources/textures/viking_room.png",
+    .enable_mipmaps = false,  // MOVE TO SAMPLER SETTING
+};
+
 }  // namespace textures

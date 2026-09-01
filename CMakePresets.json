@@ -27,7 +27,7 @@
         },
         {
             "name": "clang-release-minsize",
-            "description": "Using clang compiler and release build",
+            "description": "Using clang compiler and minsize release build",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
@@ -35,6 +35,18 @@
                 "CMAKE_C_COMPILER": "clang",
                 "CMAKE_CXX_COMPILER": "clang++",
                 "CMAKE_BUILD_TYPE": "MinSizeRel"
+            }
+        },
+                {
+            "name": "clang-release-debinfo",
+            "description": "Using clang compiler and debinfo release build",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
             }
         },
         {

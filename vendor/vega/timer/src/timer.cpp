@@ -107,7 +107,7 @@ void timer::reset(const std::string& name) noexcept {
     }
 
     _watches.at(name) = {.t0 = steady_clock::now(), .offset = 0, .running = true};
-    _console->trace("Reset timer [{:s}]", name);
+    // _console->trace("Reset timer [{:s}]", name);
   } catch (...) {
     handle_exception("Timer/reset");
   }

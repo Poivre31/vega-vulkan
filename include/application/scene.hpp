@@ -71,7 +71,7 @@ class scene {
   [[nodiscard]] auto* textures() { return &_resources.textures; }
 
   /** Should be followed by a call to 'update_texture_descriptor(app_context*)' */
-  handle<mesh_3D> load_object_and_materials(vulkan_context vk_context, const model_info& info) {
+  handle<mesh_3D> load_mesh_from_obj_mtl(vulkan_context vk_context, const model_info& info) {
     check_init();
 
     if (!info.mesh.valid) {
@@ -108,6 +108,33 @@ class scene {
           vertex.material_id = _resources.materials.get_index(_resources.default_mat);
         }
       }
+      info.mesh = _resources.meshes.push(vertices);
+    }
+    return info.mesh;
+  }
+
+  handle<mesh_3D>
+  load_mesh_from_obj(vulkan_context vk_context, const model_info& info, handle<material> material) {
+    check_init();
+
+    if (!material.valid) {
+      console::get(consoles::assets)
+          ->error(
+              "Passed an invalid material handle to scene::load_mesh_from_obj, using default "
+              "material instead"
+          );
+      material = _resources.default_mat;
+    }
+
+    if (!info.mesh.valid) {
+      auto [vertices, _] = load_object(
+          info.object_folder + info.mesh_name, info.scale, info.z_is_up
+      );
+
+      for (auto& vertex : vertices) {
+        vertex.material_id = _resources.materials.get_index(material);
+      }
+
       info.mesh = _resources.meshes.push(vertices);
     }
     return info.mesh;
