@@ -51,33 +51,9 @@ class assets_layer final : public Ilayer {
       auto& scene               = get_app_context()->active_scene;
       auto& resources           = *scene.resources();
 
-      auto properties = vk_context.physical_device->getProperties();
-      vk::SamplerCreateInfo sampler_info{
-          .magFilter               = vk::Filter::eNearest,
-          .minFilter               = vk::Filter::eNearest,
-          .mipmapMode              = vk::SamplerMipmapMode::eNearest,
-          .addressModeU            = vk::SamplerAddressMode::eRepeat,
-          .addressModeV            = vk::SamplerAddressMode::eRepeat,
-          .addressModeW            = vk::SamplerAddressMode::eRepeat,
-          .mipLodBias              = 0.0F,
-          .anisotropyEnable        = vk::True,
-          .maxAnisotropy           = properties.limits.maxSamplerAnisotropy,
-          .compareEnable           = vk::False,
-          .compareOp               = vk::CompareOp::eAlways,
-          .minLod                  = 0.0F,
-          .maxLod                  = 0.0F,
-          .borderColor             = vk::BorderColor::eIntOpaqueBlack,
-          .unnormalizedCoordinates = vk::False
-      };
-      resources.sampler = vk::raii::Sampler(*vk_context.device, sampler_info);
+      scene.init(vk_context);
 
       // TEXTURES
-      // Fallback
-      auto fallback_tex = resources.textures.push(
-          std::move(load_texture_to_gpu(vk_context, stb_image()))
-      );
-      auto fallback_mat = resources.materials.push(fallback_tex);
-
       auto beer_tex = resources.textures.push(
           std::move(load_texture_to_gpu(vk_context, stb_image(textures::beer.texture_path)))
       );
@@ -104,8 +80,10 @@ class assets_layer final : public Ilayer {
 
     } catch (const std::exception& e) {
       console::get(consoles::assets)->error("Exception during assets initialisation: {}", e.what());
+      return false;
     } catch (...) {
       console::get(consoles::assets)->error("Unknown error during assets initialisation {}");
+      return false;
     }
 
     return true;

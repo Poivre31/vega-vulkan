@@ -8,6 +8,6 @@ struct gpu_image {
 };
 
 struct gpu_material {
-  glm::vec3 color{};
+  glm::vec4 color{};
   uint32_t texture_id{};
 };

@@ -12,15 +12,15 @@ ConstantBuffer<PushConstants> push_constants;
 uniform Sampler2D textures[];
 
 struct Material {
-  float3 albedo;
+  float4 albedo;
   uint texture_id;
 };
 
 // uniform StructuredBuffer<Material>.Handle materials;
 
 static float3 light_dir     = float3(-0.2, -0.3, -1);
-static float3 light_color   = float3(1., 0.8, 0.6);
-static float3 ambient_color = float3(0.05, 0.1, 0.3);
+static float4 light_color   = float4(1., 0.8, 0.6,1);
+static float4 ambient_color = float4(0.03, 0.08, 0.2,1);
 
 struct VSInput {
   float3 position;
@@ -84,16 +84,19 @@ VertexOutput vertMain(VSInput vertex) {
 [shader("fragment")]
 float4 fragMain(VertexOutput inVert) : SV_Target {
   float intensity = clamp(dot(inVert.normal, -light_dir) / dot(light_dir, light_dir), 0, 1);
-  float3 color    = intensity * light_color + ambient_color;
+  float4 light    = intensity * light_color + ambient_color;
 
-  if(inVert.material.texture_id>=push_constants.material_count) {
-    return float4(push_constants.material_count,1,0,1);
+  if(inVert.material.texture_id>=push_constants.material_count && inVert.material.texture_id!=-1U) {
+    return float4(0,1,0,1);
   }
 
-  float3 albedo = textures[NonUniformResourceIndex(inVert.material.texture_id)]
-                      .Sample(float2(inVert.uv.x, 1 - inVert.uv.y))
-                      .rgb;
+  float4 albedo = inVert.material.albedo;
+  if(inVert.material.texture_id!=-1U) { 
+    albedo = textures[NonUniformResourceIndex(inVert.material.texture_id)]
+                        .Sample(float2(inVert.uv.x, 1 - inVert.uv.y));
+  }
+  albedo.a = 1;
 
-  return float4(albedo * color, 1);
+  return albedo*light;
   // return float4(inVert.uv, 0.5 + 0.5 * sin(3.14 * push_constants.time / 2), 1);
 }

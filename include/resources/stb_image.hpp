@@ -152,7 +152,6 @@ class stb_image {
    * been loaded */
   [[nodiscard]] stbi_uc* data() const noexcept {
     if (_use_fallback) {
-      console::get(consoles::assets)->warn("Accessing a fallback texture's data");
       return _fallback_image.data()->data();
     } else if (!_image_loaded) {
       console::get(consoles::assets)
