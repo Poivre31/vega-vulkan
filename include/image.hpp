@@ -3,13 +3,8 @@
 #include "graphics.hpp"
 #include "stb_image.hpp"
 #include "vulkan/buffer.hpp"
-#include "vulkan_context.hpp"
 #include "vulkan/single_command_buffer.hpp"
-
-struct gpu_image {
-  vma::raii::Image image   = nullptr;
-  vk::raii::ImageView view = nullptr;
-};
+#include "gpu_objects.hpp"
 
 void transition_image_layout(
     const vk::Image& image,

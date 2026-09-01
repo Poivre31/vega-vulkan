@@ -3,23 +3,12 @@
 #include <filesystem>
 #include <utility>
 #include "glm/geometric.hpp"
-#include "layer.hpp"
-#include "stb_image.hpp"
 #include "timer/timer.hpp"
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
 #include "resources/mesh_imports.hpp"
-#include "resources/texture_imports.hpp"
-
-// class material_manager {
-//  public:
-//   static uint32_t generate_material_id() { return _current_id++; }
-//   static std::unordered_map<int, uint32_t> add_materials() {}
-
-//  private:
-//   static inline uint32_t _current_id = 0;
-//   // static inline std::unordered_map<u, class Ty>
-// };
+#include "vulkan/config.hpp"
+#include "material.hpp"
 
 std::pair<std::vector<vertex_3D>, std::vector<tinyobj::material_t>>
 load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = true) {  // NOLINT
@@ -133,51 +122,4 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
         ->error("Unexpected error loading model'{}': {}", model_path, e.what());
   }
   std::abort();
-}
-
-/** Should be followed by a call to 'update_texture_descriptor(app_context*)' */
-handle<mesh_3D> load_object_and_materials(application_context* context, const model_info& info) {
-  if (!info.mesh.valid) {
-    auto [vertices, materials] = load_object(
-        info.object_folder + info.mesh_name, info.scale, info.z_is_up
-    );
-
-    std::vector<stb_image> textures;
-    textures.reserve(materials.size());
-    for (auto& material : materials) {
-      if (!material.diffuse_texname.empty()) {
-        textures.emplace_back(info.object_folder + material.diffuse_texname);
-      } else {
-        auto color = glm::vec4(material.diffuse[0], material.diffuse[1], material.diffuse[2], 1);
-        console::get(consoles::assets)
-            ->warn(
-                "No texture specified for material {}, replacing by 1x1 texture of color "
-                "({},{},{})",
-                material.name,
-                color.r,
-                color.g,
-                color.b
-            );
-        textures.emplace_back(color, 1, 1);
-      }
-    }
-
-    if (!textures.empty()) {
-      auto texture_indices = upload_textures(context, std::move(textures));
-      for (auto& vertex : vertices) {
-        vertex.material_id = context->resources.textures_.get_index(
-            texture_indices[vertex.material_id]
-        );
-      }
-    } else {
-      for (auto& vertex : vertices) {
-        vertex.material_id = 0;
-      }
-    }
-
-    mesh_3D mesh(vertices);
-    mesh.create_vertex_buffer(context->vulkan);
-    info.mesh = context->resources.meshes_.push(std::move(mesh));
-  }
-  return info.mesh;
 }

@@ -1,11 +1,9 @@
 #pragma once
 #include "glm.hpp"  // IWYU pragma: keep
 #include "graphics.hpp"
-#include "image.hpp"
-#include "vulkan_context.hpp"
+#include "vulkan/context.hpp"
 #include "vulkan/single_command_buffer.hpp"
 #include <console/console.hpp>
-#include "allocator.hpp"
 
 struct vertex_3D {
   glm::vec3 position{};

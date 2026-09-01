@@ -1,16 +1,17 @@
 #pragma once
 
-#include "allocator.hpp"
-#include "image.hpp"
-#include "layer.hpp"
-#include "object_loader.hpp"
+#include "gpu_objects.hpp"
+#include "tiny_obj_loader.h"
+#include "vulkan/context.hpp"
 #include "stb_image.hpp"
+#include "resources/handle.hpp"
 
 class material {
  public:
   material() = default;
+  material(handle<gpu_image> albedo) : albedo(albedo) {}
   material(
-      application_context* context,
+      vulkan_context vk_context,
       const std::string& parent_directory,
       tinyobj::material_t material
   ) {
@@ -31,10 +32,12 @@ class material {
       image = stb_image(color, 1, 1);
     }
 
-    albedo = context->resources.textures_.push(
-        std::move(load_texture_to_gpu(context->vulkan, std::move(image)))
-    );
+    // albedo = context->resources.textures.push(
+    //     std::move(load_texture_to_gpu(vk_context, std::move(image)))
+    // );
   }
+
+  [[nodiscard]] auto get_albedo() const { return albedo; }
 
  private:
   handle<gpu_image> albedo;

@@ -6,9 +6,12 @@
 #include <SDL3/SDL_vulkan.h>
 #include "sdl.hpp"
 #include "timer/timer.hpp"
+#include "vk_mem_alloc_enums.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
-#include "vulkan_context.hpp"
+#include "vulkan/context.hpp"
+#include "vulkan/config.hpp"
+#include <cstdint>
 #include <io.hpp>
 #include "image.hpp"
 
@@ -117,6 +120,8 @@ create_shader_module(const vk::raii::Device& device, std::string shader_code) {
 
 struct PushConstants {
   glm::mat4x4 view_projection_matrix{};
+  vk::DeviceAddress material_buffer;
+  uint32_t material_count;
   float time{};
 };
 
@@ -178,7 +183,16 @@ class vulkan_layer final : public Ilayer {
         throw std::runtime_error("No active camera set");
         _push_constants.view_projection_matrix = glm::mat4x4{1.F};
       }
-      _push_constants.time = static_cast<float>(timer::get_elapsed_time());
+      vk::BufferDeviceAddressInfo address_info{
+          .buffer = get_app_context()->active_scene.resources()->material_buffer
+      };
+      vk::DeviceAddress material_buffer_adress = _device.getBufferAddress(address_info);
+      if (!material_buffer_adress) {
+        throw std::runtime_error("Material buffer adresss is invalid");
+      }
+      _push_constants.material_buffer = material_buffer_adress;
+      _push_constants.material_count  = get_app_context()->active_scene.materials()->size();
+      _push_constants.time            = static_cast<float>(timer::get_elapsed_time());
       draw_frame();
     } catch (...) {
       handle_exception("update");
@@ -460,11 +474,13 @@ class vulkan_layer final : public Ilayer {
         vk::PhysicalDeviceVulkan13Features,
         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>
         featureChain = {
-            {.features = {.samplerAnisotropy = vk::True}},
+            {.features = {.samplerAnisotropy = vk::True, .shaderInt64 = vk::True}},
             {.shaderDrawParameters = vk::True},
             {
                 .shaderSampledImageArrayNonUniformIndexing = vk::True,
                 .runtimeDescriptorArray                    = vk::True,
+                .scalarBlockLayout                         = vk::True,
+                .bufferDeviceAddress                       = vk::True,
             },
             {
                 .synchronization2 = vk::True,
@@ -511,7 +527,10 @@ class vulkan_layer final : public Ilayer {
   }
 
   void initialize_vma() {
-    vma::AllocatorCreateInfo allocator_info{.physicalDevice = _physical_device};
+    vma::AllocatorCreateInfo allocator_info{
+        .flags          = vma::AllocatorCreateFlagBits::eBufferDeviceAddress,
+        .physicalDevice = _physical_device
+    };
     _allocator = vma::raii::createAllocator(_instance, _device, allocator_info);
   }
 
@@ -958,7 +977,7 @@ class vulkan_layer final : public Ilayer {
         _push_constants
     );
 
-    for (const auto& mesh : get_app_context()->resources.meshes_) {
+    for (const auto& mesh : *get_app_context()->active_scene.meshes()) {
       mesh.render(command_buffer);
     }
 

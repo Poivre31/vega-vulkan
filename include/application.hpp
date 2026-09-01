@@ -1,4 +1,5 @@
 #pragma once
+#include "application/context.hpp"
 #include "layer.hpp"
 #include "sdl.hpp"
 #include "camera.hpp"
@@ -33,11 +34,7 @@ class application {
     (push_layer<layers>(), ...);
   }
   ~application() {
-    _context.resources.textures.clear();
-    _context.resources.meshes.clear();
-    _context.resources.textures_.clear();
-    _context.resources.meshes_.clear();
-    _context.resources.sampler = nullptr;
+    _context.active_scene.clear();
     while (!_layers.empty()) {
       _layers.pop_back();
     }

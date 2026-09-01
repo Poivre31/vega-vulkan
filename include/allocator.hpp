@@ -6,14 +6,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
-
-template <typename T>
-struct handle {
-  uint32_t index{};
-  uint16_t allocator_id{};
-  uint16_t generation : 15 {};
-  uint16_t valid      : 1 = false;
-};
+#include "resources/handle.hpp"
 
 template <std::move_constructible T>
 class slot {
@@ -222,6 +215,7 @@ class static_allocator {
     return handle.index;
   }
 
+  [[nodiscard]] T* data() { return _objects.data(); }
   [[nodiscard]] uint32_t size() const { return _objects.size(); }
 
   void clear() {

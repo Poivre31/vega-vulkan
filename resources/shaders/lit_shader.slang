@@ -2,12 +2,21 @@
 struct PushConstants {
   //   float4x4 object_matrix;
   float4x4 view_projection_matrix;
+  Material* materials;
+  uint32_t material_count;
   float time;
 };
 [[vk::push_constant]]
 ConstantBuffer<PushConstants> push_constants;
 
-Sampler2D textures[];
+uniform Sampler2D textures[];
+
+struct Material {
+  float3 albedo;
+  uint texture_id;
+};
+
+// uniform StructuredBuffer<Material>.Handle materials;
 
 static float3 light_dir     = float3(-0.2, -0.3, -1);
 static float3 light_color   = float3(1., 0.8, 0.6);
@@ -24,7 +33,7 @@ struct VertexOutput {
   float4 position : SV_Position;
   float3 normal;
   float2 uv;
-  nointerpolation uint32_t material_id;
+  nointerpolation Material material;
 };
 
 uint randIntU(uint seed) {
@@ -54,7 +63,12 @@ VertexOutput vertMain(VSInput vertex) {
   output.position    = mul(push_constants.view_projection_matrix, output.position);
   output.normal      = vertex.normal;
   output.uv          = vertex.uv;
-  output.material_id = vertex.material_id;
+  // if(vertex.material_id<push_constants.material_count) {
+  //   output.material = Material(float3(0,0,1),0);
+  // } else {
+  //   output.material = Material(1,0);
+  // }
+  output.material = push_constants.materials[vertex.material_id];
   // if(pushConstants.culled) {
   //     output.color *= float3(1.0,0.3,0.2);
   // }
@@ -70,9 +84,13 @@ VertexOutput vertMain(VSInput vertex) {
 [shader("fragment")]
 float4 fragMain(VertexOutput inVert) : SV_Target {
   float intensity = clamp(dot(inVert.normal, -light_dir) / dot(light_dir, light_dir), 0, 1);
-  float3 color    = intensity * light_color + (1 - intensity) * ambient_color;
+  float3 color    = intensity * light_color + ambient_color;
 
-  float3 albedo = textures[NonUniformResourceIndex(inVert.material_id)]
+  if(inVert.material.texture_id>=push_constants.material_count) {
+    return float4(push_constants.material_count,1,0,1);
+  }
+
+  float3 albedo = abs(inVert.material.albedo)* textures[NonUniformResourceIndex(inVert.material.texture_id)]
                       .Sample(float2(inVert.uv.x, 1 - inVert.uv.y))
                       .rgb;
 
