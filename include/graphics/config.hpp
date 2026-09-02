@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graphics.hpp"
+#include "vulkan/vulkan.hpp"
 
 namespace vulkan_config {
 
@@ -29,6 +30,7 @@ const std::vector<const char*> requested_device_extensions = {
 
 constexpr auto color_format = vk::Format::eB8G8R8A8Srgb;
 constexpr auto color_space  = vk::ColorSpaceKHR::eSrgbNonlinear;
+constexpr auto depth_format = vk::Format::eD32Sfloat;
 
 constexpr uint32_t target_swapchain_image_count = 3;
 

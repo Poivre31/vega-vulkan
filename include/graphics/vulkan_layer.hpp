@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <console/console.hpp>
 #include <SDL3/SDL_vulkan.h>
+#include <stdexcept>
 #include <timer/timer.hpp>
 #include <cstdint>
 #include <io.hpp>
@@ -16,6 +17,7 @@
 #include "context.hpp"
 #include "config.hpp"
 #include "graphics/image_layout.hpp"
+#include "imgui_impl.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_to_string.hpp"
 
@@ -150,22 +152,28 @@ class vulkan_layer final : public Ilayer {
       create_descriptor_sets();
       create_command_buffer();
       create_synchronisation_objects();
+
+      get_app_context()->vulkan = {
+          .instance              = &_instance,
+          .physical_device       = &_physical_device,
+          .graphics_queue_family = _graphics_queue_family,
+          .graphics_queue        = &_graphics_queue,
+          .device                = &_device,
+          .allocator             = &_allocator,
+          .command_pool          = &_command_pool,
+          .imgui_descriptor_pool = &_imgui_descriptor_pool,
+          .descriptor_sets       = &_descriptor_sets,
+          .image_count           = static_cast<uint32_t>(_swapchain_images.size()),
+          .graphics_pipeline     = &_graphics_pipeline,
+          .msaa_sample_count     = _msaa_samples,
+      };
+      imgui_wrapper::init(get_app_context());
     } catch (...) {
       handle_exception("initialisation");
       return false;
     }
     _initialised = true;
 
-    get_app_context()->vulkan = {
-        .physical_device       = &_physical_device,
-        .graphics_queue_family = _graphics_queue_family,
-        .graphics_queue        = &_graphics_queue,
-        .device                = &_device,
-        .allocator             = &_allocator,
-        .command_pool          = &_command_pool,
-        .descriptor_sets       = &_descriptor_sets,
-        .msaa_sample_count     = _msaa_samples,
-    };
     _console->info("Vulkan was successfully initialised");
 
     return true;
@@ -195,6 +203,7 @@ class vulkan_layer final : public Ilayer {
           );
       _push_constants.material_count = get_app_context()->active_scene.materials()->size();
       _push_constants.time           = static_cast<float>(timer::get_elapsed_time());
+
       draw_frame();
     } catch (...) {
       handle_exception("update");
@@ -206,6 +215,7 @@ class vulkan_layer final : public Ilayer {
     if (*_device) {
       _device.waitIdle();
     }
+    imgui_wrapper::cleanup();
   }
 
   static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
@@ -806,7 +816,7 @@ class vulkan_layer final : public Ilayer {
     vk::PipelineRenderingCreateInfo pipeline_rendering_info{
         .colorAttachmentCount    = 1,
         .pColorAttachmentFormats = &_swapchain_format.format,
-        .depthAttachmentFormat   = vk::Format::eD32Sfloat
+        .depthAttachmentFormat   = vulkan_config::depth_format
     };
 
     vk::StructureChain<
@@ -840,7 +850,7 @@ class vulkan_layer final : public Ilayer {
     _depth_image = create_image(
         _allocator,
         _device,
-        vk::Format::eD32Sfloat,
+        vulkan_config::depth_format,
         _swapchain_extent.width,
         _swapchain_extent.height,
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
@@ -879,6 +889,30 @@ class vulkan_layer final : public Ilayer {
     };
 
     _descriptor_pool = vk::raii::DescriptorPool(_device, pool_info);
+
+    pool_sizes = {
+        {.type = vk::DescriptorType::eSampler, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eSampledImage, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eStorageImage, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eUniformTexelBuffer, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eStorageTexelBuffer, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eStorageBufferDynamic, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eInputAttachment, .descriptorCount = 1000},
+    };
+
+    pool_info = {
+        .flags         = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet
+                         | vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+        .maxSets       = 1000,
+        .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+        .pPoolSizes    = pool_sizes.data()
+    };
+
+    _imgui_descriptor_pool = vk::raii::DescriptorPool(_device, pool_info);
   }
 
   void create_descriptor_sets() {
@@ -1005,6 +1039,8 @@ class vulkan_layer final : public Ilayer {
       mesh.render(command_buffer);
     }
 
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *_command_buffers.at(_frame_index));
+
     command_buffer.endRendering();
 
     transition_image_layout(
@@ -1034,6 +1070,7 @@ class vulkan_layer final : public Ilayer {
   }
 
   void draw_frame() {
+    imgui_wrapper::begin_frame();
     if (get_app_context()->frame_buffer_resized) {
       _console->info("Frame buffer resized");
     }
@@ -1065,6 +1102,7 @@ class vulkan_layer final : public Ilayer {
 
     _command_buffers.at(_frame_index).reset();
 
+    ImGui::Render();
     record_command_buffer(image_index);
 
     vk::PipelineStageFlags wait_destination_stage(
@@ -1140,6 +1178,8 @@ class vulkan_layer final : public Ilayer {
   vk::raii::DescriptorSetLayout _descriptor_set_layout = nullptr;
   vk::raii::DescriptorPool _descriptor_pool            = nullptr;
   vk::raii::DescriptorSets _descriptor_sets            = nullptr;
+
+  vk::raii::DescriptorPool _imgui_descriptor_pool = nullptr;
 
   std::vector<vk::raii::CommandBuffer> _command_buffers;
   uint32_t _frame_index = 0;

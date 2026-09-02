@@ -6,6 +6,7 @@
 #include <console/console.hpp>
 #include <timer/timer.hpp>
 
+#include "imgui_impl_sdl3.h"
 #include "layer.hpp"
 #include "config.hpp"
 
@@ -67,7 +68,8 @@ class sdl_layer final : public Ilayer {
               .dy = -event.motion.yrel
           };
           break;
-
+        // case (SDL_EVENT_MOUSE_BUTTON_DOWN):
+        //   break;
         case (SDL_EVENT_WINDOW_RESIZED):
           get_app_context()->width  = event.window.data1;
           get_app_context()->height = event.window.data2;
@@ -77,6 +79,9 @@ class sdl_layer final : public Ilayer {
 
         default:
           break;
+      }
+      if (SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_LALT]) {
+        ImGui_ImplSDL3_ProcessEvent(&event);
       }
     }
   }

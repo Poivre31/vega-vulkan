@@ -14,6 +14,7 @@ add_executable(VegaVulkan)
 # target_link_options(VegaVulkan PRIVATE -fsanitize=address)
 
 target_sources(VegaVulkan PRIVATE
+    "src/vma.cpp"
     "src/main.cpp"
 
     "include/glm.hpp"
@@ -50,6 +51,7 @@ target_sources(VegaVulkan PRIVATE
     "include/resources/primitive_meshes.hpp"
     "include/resources/stb_image.hpp"
     "include/resources/texture_imports.hpp"
+    include/graphics/imgui_impl.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 
@@ -62,6 +64,22 @@ target_precompile_headers(VegaVulkan PRIVATE "include/glm.hpp" "include/graphics
 target_link_libraries(VegaVulkan PRIVATE
     vendor
 )
+
+target_sources(VegaVulkan PRIVATE
+    "vendor/imgui/imgui.cpp"
+
+    "vendor/imgui/imgui_demo.cpp"
+    "vendor/imgui/imgui_draw.cpp"
+    "vendor/imgui/imgui_tables.cpp"
+    "vendor/imgui/imgui_widgets.cpp"
+
+    "vendor/imgui/backends/imgui_impl_vulkan.cpp"
+    "vendor/imgui/backends/imgui_impl_sdl3.cpp"
+
+    "vendor/imgui/misc/cpp/imgui_stdlib.cpp"
+)
+
+target_include_directories(VegaVulkan PRIVATE "vendor/imgui" "vendor/imgui/backends")
 
 set_target_properties(VegaVulkan PROPERTIES
     BUILD_RPATH "$ORIGIN"

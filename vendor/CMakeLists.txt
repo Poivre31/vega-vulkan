@@ -11,7 +11,7 @@ add_subdirectory(vega/timer)
 
 # VULKAN
 # FOR LINUX : install libvulkan-dev vulkan-validationlayers mesa-vulkan-drivers vulkan-tools
-if (UNIX)
+if(UNIX)
     FetchContent_Declare(vulkan_headers
         GIT_REPOSITORY https://github.com/KhronosGroup/vulkan-headers
         GIT_TAG e3b1eec08173d6b825cd3ac88c885a63b621504a # 1.4.357
@@ -78,8 +78,6 @@ install(PROGRAMS ${SLANG_SHARED_LIB}
 # VMA
 add_subdirectory(vma-hpp)
 target_include_directories(vendor INTERFACE vma-hpp/VulkanMemoryAllocator/include)
-
-target_compile_definitions(vendor INTERFACE VMA_IMPLEMENTATION)
 # END VMA
 
 # GLM
@@ -139,6 +137,10 @@ elseif(UNIX)
     )
 endif()
 # END SDL3
+
+# IMGUI
+
+# END IMGUI
 
 target_link_libraries(vendor INTERFACE
     sdl
