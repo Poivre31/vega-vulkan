@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "application/config.hpp"
 #include "application/scene.hpp"
 
 #include "player/camera.hpp"
@@ -11,8 +12,8 @@
 struct application_context {
   SDL_Window* window = nullptr;
 
-  int width    = 1280;
-  int height   = 720;
+  int width    = config::startup_width;
+  int height   = config::startup_height;
   bool running = false;
 
   double time                   = 0.;

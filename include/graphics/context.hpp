@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graphics.hpp"
+#include "vulkan/vulkan.hpp"
 
 struct vulkan_context {
   vk::raii::PhysicalDevice* physical_device = nullptr;
@@ -12,5 +13,6 @@ struct vulkan_context {
 
   vk::raii::DescriptorSets* descriptor_sets = nullptr;
 
-  bool recreate_graphics_pipeline = false;
+  bool recreate_graphics_pipeline        = false;
+  vk::SampleCountFlags msaa_sample_count = vk::SampleCountFlagBits::e1;
 };

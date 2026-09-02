@@ -42,4 +42,7 @@ constexpr uint32_t frames_in_flight  = 2;
 constexpr vk::ClearValue clear_color = vk::ClearColorValue(0.9F, 0.1F, 0.2F, 1.F);
 constexpr vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.F, 0);
 
+constexpr vk::SampleCountFlags target_msaa_sample_count = vk::SampleCountFlagBits::e4;
+constexpr float msaa_shading_rate                       = 0.5F;
+
 }  // namespace vulkan_config

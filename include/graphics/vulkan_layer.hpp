@@ -10,10 +10,14 @@
 #include "application/layer.hpp"
 #include "application/sdl.hpp"
 
+#include "graphics/gpu_objects.hpp"
 #include "graphics/image.hpp"
 #include "graphics.hpp"
 #include "context.hpp"
 #include "config.hpp"
+#include "graphics/image_layout.hpp"
+#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_to_string.hpp"
 
 inline bool is_device_suitable(const vk::raii::PhysicalDevice& device) {
   auto device_properties = device.getProperties();
@@ -160,6 +164,7 @@ class vulkan_layer final : public Ilayer {
         .allocator             = &_allocator,
         .command_pool          = &_command_pool,
         .descriptor_sets       = &_descriptor_sets,
+        .msaa_sample_count     = _msaa_samples,
     };
     _console->info("Vulkan was successfully initialised");
 
@@ -226,27 +231,6 @@ class vulkan_layer final : public Ilayer {
   }
 
  private:
-  // [[nodiscard]] bool check_number_of_messages(std::string_view message) {
-  //   uint64_t message_hash           = std::hash<std::string_view>{}(message);
-  //   auto number_of_message_instance = _debug_message_instances.find(message_hash);
-  //   if (number_of_message_instance != _debug_message_instances.end()) {
-  //     if (number_of_message_instance->second > vulkan_config::max_number_of_exception_error) {
-  //       return false;
-  //     } else {
-  //       if (number_of_message_instance->second == vulkan_config::max_number_of_exception_error) {
-  //         _console->warn(
-  //             "Exception has been shown {}, this is the last time it is printed:  ",
-  //             vulkan_config::max_number_of_exception_error
-  //         );
-  //       }
-  //       number_of_message_instance->second++;
-  //     }
-  //   } else {
-  //     _debug_message_instances.emplace(message_hash, 0);
-  //   }
-  //   return true;
-  // }
-
   static void handle_exception(const std::string& context) noexcept {
     try {
       throw;
@@ -412,8 +396,16 @@ class vulkan_layer final : public Ilayer {
         vk::PhysicalDeviceVulkan13Features,
         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
 
+    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'sample shading rate', exiting"
+      );
+    }
     if (!features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy) {
       throw std::runtime_error("Selected physical device doesn't support 'anisotropy', exiting");
+    }
+    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.shaderInt64) {
+      throw std::runtime_error("Selected physical device doesn't support '64bit int', exiting");
     }
     if (!features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters) {
       throw std::runtime_error(
@@ -430,6 +422,11 @@ class vulkan_layer final : public Ilayer {
     if (!features.template get<vk::PhysicalDeviceVulkan12Features>().runtimeDescriptorArray) {
       throw std::runtime_error(
           "Selected physical device doesn't support 'runtime descriptor array', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan12Features>().bufferDeviceAddress) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'buffer device adress', exiting"
       );
     }
     if (!features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering) {
@@ -459,6 +456,41 @@ class vulkan_layer final : public Ilayer {
           )
       );
     }
+
+    // CHOOSE MSAA SAMPLES
+    vk::SampleCountFlags counts = device_properties.limits.framebufferColorSampleCounts
+                                  & device_properties.limits.framebufferDepthSampleCounts;
+    if (counts & vk::SampleCountFlagBits::e64
+        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e64) {
+      _msaa_samples = vk::SampleCountFlagBits::e64;
+      return;
+    }
+    if (counts & vk::SampleCountFlagBits::e32
+        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e32) {
+      _msaa_samples = vk::SampleCountFlagBits::e32;
+      return;
+    }
+    if (counts & vk::SampleCountFlagBits::e16
+        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e16) {
+      _msaa_samples = vk::SampleCountFlagBits::e16;
+      return;
+    }
+    if (counts & vk::SampleCountFlagBits::e8
+        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e8) {
+      _msaa_samples = vk::SampleCountFlagBits::e8;
+      return;
+    }
+    if (counts & vk::SampleCountFlagBits::e4
+        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e4) {
+      _msaa_samples = vk::SampleCountFlagBits::e4;
+      return;
+    }
+    if (counts & vk::SampleCountFlagBits::e2
+        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e2) {
+      _msaa_samples = vk::SampleCountFlagBits::e2;
+      return;
+    }
+    _msaa_samples = vk::SampleCountFlagBits::e1;
   }
 
   void create_logical_device() {
@@ -470,12 +502,14 @@ class vulkan_layer final : public Ilayer {
         vk::PhysicalDeviceVulkan13Features,
         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>
         featureChain = {
-            {.features = {.samplerAnisotropy = vk::True, .shaderInt64 = vk::True}},
+            {.features =
+                 {.sampleRateShading = vk::True,
+                  .samplerAnisotropy = vk::True,
+                  .shaderInt64       = vk::True}},
             {.shaderDrawParameters = vk::True},
             {
                 .shaderSampledImageArrayNonUniformIndexing = vk::True,
                 .runtimeDescriptorArray                    = vk::True,
-                .scalarBlockLayout                         = vk::True,
                 .bufferDeviceAddress                       = vk::True,
             },
             {
@@ -570,6 +604,7 @@ class vulkan_layer final : public Ilayer {
         .presentMode      = present_mode,
         .clipped          = vk::True,
         .oldSwapchain     = nullptr
+
     };
 
     // CREATING SWAPCHAIN IMAGE VIEWS
@@ -595,6 +630,22 @@ class vulkan_layer final : public Ilayer {
       vk::SemaphoreCreateInfo semaphore_info{};
       _swapchain_semaphores.emplace_back(_device, semaphore_info);
     }
+
+    // MULTISAMPLING IMAGE
+    if (_msaa_samples != vk::SampleCountFlagBits::e1) {
+      _color_image = create_image(
+          _allocator,
+          _device,
+          vulkan_config::color_format,
+          _swapchain_extent.width,
+          _swapchain_extent.height,
+          vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
+          vk::ImageAspectFlagBits::eColor,
+          false,
+          1,
+          _msaa_samples
+      );
+    }
   }
 
   void recreate_swapchain() {
@@ -604,6 +655,10 @@ class vulkan_layer final : public Ilayer {
     _swapchain_semaphores.clear();
     _swapchain_views.clear();
     _swapchain_images.clear();
+    _color_image.image = nullptr;
+    _color_image.view  = nullptr;
+    _depth_image.image = nullptr;
+    _depth_image.view  = nullptr;
     create_swapchain();
     create_depth_resources();
   }
@@ -636,10 +691,6 @@ class vulkan_layer final : public Ilayer {
   }
 
   void create_graphics_pipeline() {
-    // vk::raii::ShaderModule shader_module = create_shader_module(
-    //     _device, read_file(vulkan_config::shader_path)
-    // );
-
     vk::ShaderModuleCreateInfo shader_module_info{
         .codeSize = get_app_context()->shader_modules[0].size(),
         .pCode    = reinterpret_cast<uint32_t*>(get_app_context()->shader_modules[0].data())
@@ -690,7 +741,9 @@ class vulkan_layer final : public Ilayer {
     // Line width greater than 1.0 requires GPU extension
 
     vk::PipelineMultisampleStateCreateInfo multisampling{
-        .rasterizationSamples = vk::SampleCountFlagBits::e1, .sampleShadingEnable = vk::False
+        .rasterizationSamples = _msaa_samples,
+        .sampleShadingEnable  = vk::True,
+        .minSampleShading     = vulkan_config::msaa_shading_rate,
     };
 
     vk::PipelineColorBlendAttachmentState color_blend_attachment{
@@ -790,7 +843,10 @@ class vulkan_layer final : public Ilayer {
         _swapchain_extent.width,
         _swapchain_extent.height,
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
-        vk::ImageAspectFlagBits::eDepth
+        vk::ImageAspectFlagBits::eDepth,
+        false,
+        1,
+        _msaa_samples
     );
     auto cmd = begin_transient_command_buffer(_command_pool, _device);
     transition_image_global_layout(
@@ -835,35 +891,6 @@ class vulkan_layer final : public Ilayer {
     };
 
     _descriptor_sets = _device.allocateDescriptorSets(descriptor_set_info);
-
-    // stb_image beer;
-    // beer.load("resources/textures/ber.png");
-    // vulkan_context ah = {
-    //     .graphics_queue = &_graphics_queue,
-    //     .device         = &_device,
-    //     .allocator      = &_allocator,
-    //     .command_pool   = &_command_pool,
-    // };
-    // image = load_texture_to_gpu(ah, std::move(beer));
-
-    // for (uint32_t i = 0; i < vulkan_config::frames_in_flight; i++) {
-    //   vk::DescriptorImageInfo imageInfo{
-    //       .sampler     = _image_sampler,
-    //       .imageView   = image.view,
-    //       .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-    //   };
-
-    //   std::vector<vk::WriteDescriptorSet> write_descriptor_set{vk::WriteDescriptorSet{
-    //       .dstSet          = _descriptor_sets.at(i),
-    //       .dstBinding      = 0,
-    //       .dstArrayElement = 0,
-    //       .descriptorCount = 1,
-    //       .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
-    //       .pImageInfo      = &imageInfo
-    //   }};
-
-    //   _device.updateDescriptorSets(write_descriptor_set, {});
-    // }
   }
 
   void create_command_buffer() {
@@ -881,6 +908,17 @@ class vulkan_layer final : public Ilayer {
     vk::CommandBufferBeginInfo beginInfo{};
     command_buffer.begin(beginInfo);
 
+    if (_msaa_samples != vk::SampleCountFlagBits::e1) {
+      transition_image_global_layout(
+          _color_image,
+          command_buffer,
+          vk::ImageLayout::eColorAttachmentOptimal,
+          vk::AccessFlagBits2::eColorAttachmentWrite,
+          vk::AccessFlagBits2::eColorAttachmentWrite,
+          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+          vk::PipelineStageFlagBits2::eColorAttachmentOutput
+      );
+    }
     transition_image_layout(
         _swapchain_images.at(image_index),
         command_buffer,
@@ -893,14 +931,27 @@ class vulkan_layer final : public Ilayer {
         vk::ImageAspectFlagBits::eColor
     );
 
-    vk::RenderingAttachmentInfo color_attachment_info{
-        .imageView   = _swapchain_views.at(image_index),
-        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-        .loadOp      = vk::AttachmentLoadOp::eClear,
-        .storeOp     = vk::AttachmentStoreOp::eStore,
-        .clearValue  = vulkan_config::clear_color
-    };
-
+    vk::RenderingAttachmentInfo color_attachment_info;
+    if (_msaa_samples != vk::SampleCountFlagBits::e1) {
+      color_attachment_info = {
+          .imageView          = _color_image.view,
+          .imageLayout        = vk::ImageLayout::eColorAttachmentOptimal,
+          .resolveMode        = vk::ResolveModeFlagBits::eAverage,
+          .resolveImageView   = *_swapchain_views.at(image_index),
+          .resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+          .loadOp             = vk::AttachmentLoadOp::eClear,
+          .storeOp            = vk::AttachmentStoreOp::eDontCare,
+          .clearValue         = vulkan_config::clear_color
+      };
+    } else {
+      color_attachment_info = {
+          .imageView   = *_swapchain_views.at(image_index),
+          .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+          .loadOp      = vk::AttachmentLoadOp::eClear,
+          .storeOp     = vk::AttachmentStoreOp::eStore,
+          .clearValue  = vulkan_config::clear_color
+      };
+    }
     vk::RenderingAttachmentInfo depth_attachment_info{
         .imageView   = _depth_image.view,
         .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
@@ -1074,6 +1125,8 @@ class vulkan_layer final : public Ilayer {
   std::vector<vk::Image> _swapchain_images;
   std::vector<vk::raii::ImageView> _swapchain_views;
   std::vector<vk::raii::Semaphore> _swapchain_semaphores;
+  gpu_image _color_image;
+  vk::SampleCountFlagBits _msaa_samples = vk::SampleCountFlagBits::e1;
 
   vk::raii::Pipeline _graphics_pipeline = nullptr;
   PushConstants _push_constants;

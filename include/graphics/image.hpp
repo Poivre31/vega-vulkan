@@ -1,10 +1,12 @@
 #pragma once
 
+#include "graphics/gpu_objects.hpp"
 #include "resources/stb_image.hpp"
 
 #include "image_layout.hpp"
 #include "single_command_buffer.hpp"
 #include "context.hpp"
+#include "vulkan/vulkan.hpp"
 
 class simple_sampler {
  public:
@@ -117,17 +119,22 @@ gpu_image create_image(
     uint32_t height,
     vk::ImageUsageFlags usage,
     vk::ImageAspectFlags aspect,
-    uint32_t mip_level_count = 1
+    bool transfer,
+    uint32_t mip_level_count             = 1,
+    vk::SampleCountFlagBits msaa_samples = vk::SampleCountFlagBits::e1
 ) {
+  if (transfer) {
+    usage |= vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
+  }
   vk::ImageCreateInfo image_info{
       .imageType   = vk::ImageType::e2D,
       .format      = format,
       .extent      = {.width = width, .height = height, .depth = 1},
       .mipLevels   = mip_level_count,
       .arrayLayers = 1,
-      .samples     = vk::SampleCountFlagBits::e1,
+      .samples     = msaa_samples,
       .tiling      = vk::ImageTiling::eOptimal,
-      .usage = usage | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst,
+      .usage       = usage,
       .sharingMode = vk::SharingMode::eExclusive
   };
   vma::AllocationCreateInfo allocation_info{.usage = vma::MemoryUsage::eAutoPreferDevice};
@@ -155,7 +162,7 @@ gpu_image create_image(
       .format          = format,
       .aspect          = aspect,
       .layout          = vk::ImageLayout::eUndefined,
-      .mip_level_count = mip_level_count,
+      .mip_level_count = mip_level_count
   };
 }
 
@@ -193,6 +200,7 @@ load_texture_to_gpu(vulkan_context& vk_context, stb_image&& cpu_texture, simple_
       texture.height(),
       vk::ImageUsageFlagBits::eSampled,
       vk::ImageAspectFlagBits::eColor,
+      true,
       mip_level_count
   );
 

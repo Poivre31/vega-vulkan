@@ -2,6 +2,7 @@
 
 #include <stb_image.h>
 #include <cstdint>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <console/console.hpp>
@@ -106,6 +107,15 @@ class stb_image {
         target_channels = channels::RGBA;
       }
 
+      if (target_channels != channels::RGBA) {
+        console::get(consoles::assets)
+            ->error(
+                "Only RGBA channels are supported for loaded images at this point (image file "
+                "have fewer channels, changing target to RGBA)"
+            );
+        target_channels = channels::RGBA;
+      }
+
       auto* image_data = stbi_load(
           path.string().data(),
           &_tex_width,
@@ -122,6 +132,7 @@ class stb_image {
         return;
       }
       _data         = stb_image_ptr(image_data, stbi_image_free);
+      _image_loaded = true;
       _image_loaded = true;
       _channels     = static_cast<int>(target_channels);
       _use_fallback = false;
