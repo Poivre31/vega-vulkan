@@ -24,7 +24,7 @@ const std::vector<const char*> requested_layers     = {
 };
 const std::vector<const char*> requested_device_extensions = {
     vk::KHRSwapchainExtensionName,  //, vk::EXTPageableDeviceLocalMemoryExtensionName
-                                    // vk::ARMTensorsExtensionName,
+    vk::EXTRobustness2ExtensionName,
 };
 
 constexpr auto color_format = vk::Format::eB8G8R8A8Srgb;
@@ -39,10 +39,10 @@ const std::string shader_path = "resources/shaders/lit_shader.spv";
 constexpr uint32_t max_number_of_textures = 1024;
 
 constexpr uint32_t frames_in_flight  = 2;
-constexpr vk::ClearValue clear_color = vk::ClearColorValue(0.9F, 0.1F, 0.2F, 1.F);
+constexpr vk::ClearValue clear_color = vk::ClearColorValue(0.F, 0.F, 0.F, 0.F);
 constexpr vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.F, 0);
 
 constexpr vk::SampleCountFlags target_msaa_sample_count = vk::SampleCountFlagBits::e4;
-constexpr float msaa_shading_rate                       = 0.5F;
+constexpr float msaa_shading_rate                       = 0.2F;
 
 }  // namespace vulkan_config

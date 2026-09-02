@@ -210,7 +210,7 @@ load_texture_to_gpu(vulkan_context& vk_context, stb_image&& cpu_texture, simple_
       cmd,
       vk::ImageLayout::eTransferDstOptimal,
       {},
-      vk::AccessFlagBits2::eTransferRead,
+      vk::AccessFlagBits2::eTransferWrite,
       vk::PipelineStageFlagBits2::eTopOfPipe,
       vk::PipelineStageFlagBits2::eTransfer
   );

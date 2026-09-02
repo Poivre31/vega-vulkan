@@ -83,7 +83,7 @@ VertexOutput vertMain(VSInput vertex) {
 
 [shader("fragment")]
 float4 fragMain(VertexOutput inVert) : SV_Target {
-  float intensity = clamp(dot(inVert.normal, -light_dir) / dot(light_dir, light_dir), 0, 1);
+  float intensity = clamp(dot(inVert.normal, -light_dir) / length(light_dir), 0, 1);
   float4 light    = intensity * light_color + ambient_color;
 
   if (inVert.material.texture_id >= push_constants.material_count

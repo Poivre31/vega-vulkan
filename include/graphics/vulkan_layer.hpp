@@ -180,6 +180,7 @@ class vulkan_layer final : public Ilayer {
         recreate_graphics_pipeline();
         get_app_context()->vulkan.recreate_graphics_pipeline = false;
       }
+
       if (get_app_context()->active_camera) {
         _push_constants.view_projection_matrix =
             get_app_context()->active_camera->get_view_projection_matrix();
@@ -733,7 +734,7 @@ class vulkan_layer final : public Ilayer {
         .depthClampEnable        = vk::False,
         .rasterizerDiscardEnable = vk::False,
         .polygonMode             = vk::PolygonMode::eFill,
-        .cullMode                = vk::CullModeFlagBits::eNone,
+        .cullMode                = vk::CullModeFlagBits::eBack,
         .frontFace               = vk::FrontFace::eClockwise,
         .depthBiasEnable         = vk::False,
         .lineWidth               = 1.0F
