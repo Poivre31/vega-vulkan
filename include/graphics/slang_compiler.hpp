@@ -4,8 +4,10 @@
 #include <slang-com-ptr.h>
 #include <slang-com-helper.h>
 #include <sys/types.h>
-#include <cstddef>
 #include <cstdint>
+#include <fstream>
+#include <ios>
+#include <string>
 #include <vector>
 #include <io.hpp>
 #include <console/console.hpp>
@@ -199,6 +201,16 @@ class slang_layer final : public Ilayer {
         return false;
       }
     }
+
+    std::ofstream spirv_debug(
+        std::string("resources/shaders/") + slang_module->getName() + std::string(".spv"),
+        std::ios::binary
+    );
+    spirv_debug.write(
+        reinterpret_cast<const char*>(spirv_code->getBufferPointer()),
+        static_cast<std::streamsize>(spirv_code->getBufferSize())
+    );
+    spirv_debug.close();
 
     get_app_context()->shader_modules.clear();
     get_app_context()->shader_modules.emplace_back(

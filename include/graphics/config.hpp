@@ -19,16 +19,14 @@ constexpr bool enable_validation = true;
 
 constexpr uint8_t max_number_of_exception_error = 10;
 
-const std::vector<const char*> requested_extensions = {};
-const std::vector<const char*> requested_layers     = {
-    "VK_LAYER_KHRONOS_validation",
-};
+const std::vector<const char*> requested_extensions        = {};
+const std::vector<const char*> requested_layers            = {};
 const std::vector<const char*> requested_device_extensions = {
     vk::KHRSwapchainExtensionName,  //, vk::EXTPageableDeviceLocalMemoryExtensionName
     vk::EXTRobustness2ExtensionName,
 };
 
-constexpr auto color_format = vk::Format::eB8G8R8A8Srgb;
+constexpr auto color_format = vk::Format::eB8G8R8A8Unorm;
 constexpr auto color_space  = vk::ColorSpaceKHR::eSrgbNonlinear;
 constexpr auto depth_format = vk::Format::eD32Sfloat;
 
@@ -38,13 +36,13 @@ constexpr bool vsync = false;
 
 const std::string shader_path = "resources/shaders/lit_shader.spv";
 
-constexpr uint32_t max_number_of_textures = 1024;
+constexpr uint32_t max_number_of_textures = 512;
 
 constexpr uint32_t frames_in_flight  = 2;
 constexpr vk::ClearValue clear_color = vk::ClearColorValue(0.F, 0.F, 0.F, 0.F);
 constexpr vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.F, 0);
 
-constexpr vk::SampleCountFlags target_msaa_sample_count = vk::SampleCountFlagBits::e4;
-constexpr float msaa_shading_rate                       = 0.2F;
+constexpr vk::SampleCountFlags target_msaa_sample_count = vk::SampleCountFlagBits::e8;
+constexpr float msaa_shading_rate                       = 0.5F;
 
 }  // namespace vulkan_config

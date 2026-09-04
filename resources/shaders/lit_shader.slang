@@ -56,6 +56,10 @@ float3 randFloat3(float a, float b, uint seed) {
   );
 }
 
+float4 linear_to_srgb(float4 x) {
+  return select(x<=0.0031308, 12.92*x, 1.055*pow(x,1./2.4)-0.055);
+}
+
 [shader("vertex")]
 VertexOutput vertMain(VSInput vertex) {
   VertexOutput output;
@@ -99,6 +103,5 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
   }
   albedo.a = 1;
 
-  return albedo * light;
-  // return float4(inVert.uv, 0.5 + 0.5 * sin(3.14 * push_constants.time / 2), 1);
+  return linear_to_srgb(albedo*light);
 }

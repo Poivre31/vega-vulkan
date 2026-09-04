@@ -61,14 +61,14 @@ inline vk::SurfaceFormatKHR get_swapchain_format(
 ) {
   auto available = physical_device.getSurfaceFormatsKHR(*surface);
 
-  std::string error_message("Surface format choosed is not available, choose among: \n");
+  std::string error_message("Surface format choosed is not available, choose among:");
   for (const auto& format : available) {
     if (format.format == vulkan_config::color_format
         && format.colorSpace == vulkan_config::color_space) {
       return format;
     }
-    error_message += "  -" + vk::to_string(format.format) + " " + vk::to_string(format.colorSpace)
-                     + "\n";
+    error_message += "\n  -" + vk::to_string(format.format) + " "
+                     + vk::to_string(format.colorSpace);
   }
 
   throw std::runtime_error(error_message);
@@ -115,15 +115,6 @@ get_present_mode(const vk::PhysicalDevice& physical_device, const vk::raii::Surf
   return vk::PresentModeKHR::eFifo;
 }
 
-inline vk::raii::ShaderModule
-create_shader_module(const vk::raii::Device& device, std::string shader_code) {
-  vk::ShaderModuleCreateInfo shader_module_info{
-      .codeSize = static_cast<uint32_t>(shader_code.size()),
-      .pCode    = reinterpret_cast<uint32_t*>(shader_code.data())
-  };
-  return {device, shader_module_info};
-}
-
 struct PushConstants {
   glm::mat4x4 view_projection_matrix{};
   vk::DeviceAddress material_buffer;
@@ -167,7 +158,8 @@ class vulkan_layer final : public Ilayer {
           .graphics_pipeline     = &_graphics_pipeline,
           .msaa_sample_count     = _msaa_samples,
       };
-      imgui_wrapper::init(get_app_context());
+      imgui_init(get_app_context()->window, get_app_context()->vulkan);
+      _imgui_initialised = true;
     } catch (...) {
       handle_exception("initialisation");
       return false;
@@ -215,7 +207,11 @@ class vulkan_layer final : public Ilayer {
     if (*_device) {
       _device.waitIdle();
     }
-    imgui_wrapper::cleanup();
+    if (_imgui_initialised) {
+      imgui_cleanup();
+    }
+    _initialised       = false;
+    _imgui_initialised = false;
   }
 
   static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
@@ -289,9 +285,9 @@ class vulkan_layer final : public Ilayer {
     }
 
     // SELECTING LAYERS
-    std::vector<const char*> layers;
+    std::vector<const char*> layers = vulkan_config::requested_layers;
     if (vulkan_config::enable_validation) {
-      layers = vulkan_config::requested_layers;
+      layers.push_back("VK_LAYER_KHRONOS_validation");
     }
 
     auto layer_properties = _context.enumerateInstanceLayerProperties();
@@ -318,6 +314,9 @@ class vulkan_layer final : public Ilayer {
         .ppEnabledExtensionNames = extensions.data(),
     };
     _instance = vk::raii::Instance(_context, instance_info);
+    if (!*_instance) {
+      throw std::runtime_error("Instance creation silently failed");
+    }
 
     _instance_running = true;
   }
@@ -343,6 +342,10 @@ class vulkan_layer final : public Ilayer {
         .pfnUserCallback = &debug_callback
     };
     _debug_messenger = _instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
+
+    if (!*_debug_messenger) {
+      throw std::runtime_error("Debug messenger creation silently failed");
+    }
   }
 
   void create_surface() {
@@ -352,6 +355,10 @@ class vulkan_layer final : public Ilayer {
       throw sdl_exception(SDL_GetError());
     }
     _surface = vk::raii::SurfaceKHR(_instance, surface);
+
+    if (!*_surface) {
+      throw std::runtime_error("Surface creation silently failed");
+    }
   }
 
   void pick_physical_device() {
@@ -391,6 +398,9 @@ class vulkan_layer final : public Ilayer {
     }
     if (!*_physical_device) {
       _physical_device = suitable.front();
+    }
+    if (!*_physical_device) {
+      throw std::runtime_error("Physical device creation silently failed");
     }
 
     auto device_properties = _physical_device.getProperties2().properties;
@@ -527,7 +537,7 @@ class vulkan_layer final : public Ilayer {
                 .synchronization2 = vk::True,
                 .dynamicRendering = vk::True,
             },
-            {.extendedDynamicState = vk::False}
+            {.extendedDynamicState = vk::True}
         };
 
     // CHOOSING QUEUE FAMILY
@@ -563,8 +573,14 @@ class vulkan_layer final : public Ilayer {
         .ppEnabledExtensionNames = vulkan_config::requested_device_extensions.data(),
     };
 
-    _device         = vk::raii::Device(_physical_device, device_info);
+    _device = vk::raii::Device(_physical_device, device_info);
+    if (!*_device) {
+      throw std::runtime_error("Logical device creation silently failed");
+    }
     _graphics_queue = vk::raii::Queue(_device, _graphics_queue_family, 0);
+    if (!*_graphics_queue) {
+      throw std::runtime_error("Graphics queue creation silently failed");
+    }
   }
 
   void initialize_vma() {
@@ -573,6 +589,9 @@ class vulkan_layer final : public Ilayer {
         .physicalDevice = _physical_device
     };
     _allocator = vma::raii::createAllocator(_instance, _device, allocator_info);
+    if (!*_allocator) {
+      throw std::runtime_error("VMA allocator creation silently failed");
+    }
   }
 
   void create_swapchain() {
@@ -615,11 +634,13 @@ class vulkan_layer final : public Ilayer {
         .presentMode      = present_mode,
         .clipped          = vk::True,
         .oldSwapchain     = nullptr
-
     };
 
     // CREATING SWAPCHAIN IMAGE VIEWS
-    _swapchain        = vk::raii::SwapchainKHR(_device, swapchain_info);
+    _swapchain = vk::raii::SwapchainKHR(_device, swapchain_info);
+    if (!*_swapchain) {
+      throw std::runtime_error("Swapchain creation silently failed");
+    }
     _swapchain_images = _swapchain.getImages();
 
     vk::ImageViewCreateInfo view_info{
@@ -660,18 +681,24 @@ class vulkan_layer final : public Ilayer {
   }
 
   void recreate_swapchain() {
-    _console->info("Recreating swapchain");
-    _device.waitIdle();
-    _swapchain = nullptr;
-    _swapchain_semaphores.clear();
-    _swapchain_views.clear();
-    _swapchain_images.clear();
-    _color_image.image = nullptr;
-    _color_image.view  = nullptr;
-    _depth_image.image = nullptr;
-    _depth_image.view  = nullptr;
-    create_swapchain();
-    create_depth_resources();
+    try {
+      _console->info("Recreating swapchain");
+      _device.waitIdle();
+      _swapchain = nullptr;
+      _swapchain_semaphores.clear();
+      _swapchain_views.clear();
+      _swapchain_images.clear();
+      _color_image.image = nullptr;
+      _color_image.view  = nullptr;
+      _depth_image.image = nullptr;
+      _depth_image.view  = nullptr;
+      create_swapchain();
+      create_depth_resources();
+    } catch (...) {
+      handle_exception("swapchain recreation");
+      _initialised       = false;
+      _imgui_initialised = false;
+    }
   }
 
   void create_descriptor_set_layouts() {
@@ -699,6 +726,9 @@ class vulkan_layer final : public Ilayer {
     };
 
     _descriptor_set_layout = vk::raii::DescriptorSetLayout(_device, layout_info);
+    if (!*_descriptor_set_layout) {
+      throw std::runtime_error("Descriptor set layout creation silently failed");
+    }
   }
 
   void create_graphics_pipeline() {
@@ -707,19 +737,22 @@ class vulkan_layer final : public Ilayer {
         .pCode    = reinterpret_cast<uint32_t*>(get_app_context()->shader_modules[0].data())
     };
     vk::raii::ShaderModule shader_module(_device, shader_module_info);
+    if (!*shader_module) {
+      throw std::runtime_error("Shader module creation silently failed");
+    }
 
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stages{
         {.stage = vk::ShaderStageFlagBits::eVertex, .module = shader_module, .pName = "vertMain"},
         {.stage = vk::ShaderStageFlagBits::eFragment, .module = shader_module, .pName = "fragMain"}
     };
 
-    auto bindingDescription   = vertex_3D::binding_description();
-    auto attributeDescription = vertex_3D::attribute_description();
+    auto binding_description   = vertex_3D::binding_description();
+    auto attribute_description = vertex_3D::attribute_description();
     vk::PipelineVertexInputStateCreateInfo vertex_input_info{
         .vertexBindingDescriptionCount   = 1,
-        .pVertexBindingDescriptions      = &bindingDescription,
-        .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size()),
-        .pVertexAttributeDescriptions    = attributeDescription.data()
+        .pVertexBindingDescriptions      = &binding_description,
+        .vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_description.size()),
+        .pVertexAttributeDescriptions    = attribute_description.data()
     };
 
     vk::PipelineInputAssemblyStateCreateInfo input_assembly_info{
@@ -797,6 +830,9 @@ class vulkan_layer final : public Ilayer {
     };
 
     _pipeline_layout = vk::raii::PipelineLayout(_device, pipeline_layout_info);
+    if (!*_pipeline_layout) {
+      throw std::runtime_error("Pipeline layout creation silently failed");
+    }
 
     vk::GraphicsPipelineCreateInfo graphics_pipeline_info{
         .stageCount          = static_cast<uint32_t>(shader_stages.size()),
@@ -830,12 +866,21 @@ class vulkan_layer final : public Ilayer {
     _graphics_pipeline = vk::raii::Pipeline(
         _device, nullptr, pipeline_info_chain.get<vk::GraphicsPipelineCreateInfo>()
     );
+    if (!*_graphics_pipeline) {
+      throw std::runtime_error("Graphics pipeline creation silently failed");
+    }
   }
 
   void recreate_graphics_pipeline() {
-    _device.waitIdle();
-    _graphics_pipeline = nullptr;
-    create_graphics_pipeline();
+    try {
+      _device.waitIdle();
+      _graphics_pipeline = nullptr;
+      create_graphics_pipeline();
+    } catch (...) {
+      handle_exception("graphics pipeline recreation");
+      _initialised       = false;
+      _imgui_initialised = false;
+    }
   }
 
   void create_command_pool() {
@@ -844,6 +889,9 @@ class vulkan_layer final : public Ilayer {
         .queueFamilyIndex = _graphics_queue_family
     };
     _command_pool = vk::raii::CommandPool(_device, pool_info);
+    if (!*_command_pool) {
+      throw std::runtime_error("Command pool creation silently failed");
+    }
   }
 
   void create_depth_resources() {
@@ -889,6 +937,9 @@ class vulkan_layer final : public Ilayer {
     };
 
     _descriptor_pool = vk::raii::DescriptorPool(_device, pool_info);
+    if (!*_descriptor_pool) {
+      throw std::runtime_error("Descriptor pool creation silently failed");
+    }
 
     pool_sizes = {
         {.type = vk::DescriptorType::eSampler, .descriptorCount = 1000},
@@ -913,6 +964,9 @@ class vulkan_layer final : public Ilayer {
     };
 
     _imgui_descriptor_pool = vk::raii::DescriptorPool(_device, pool_info);
+    if (!*_imgui_descriptor_pool) {
+      throw std::runtime_error("ImGui's descriptor pool creation silently failed");
+    }
   }
 
   void create_descriptor_sets() {
@@ -1039,6 +1093,7 @@ class vulkan_layer final : public Ilayer {
       mesh.render(command_buffer);
     }
 
+    ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *_command_buffers.at(_frame_index));
 
     command_buffer.endRendering();
@@ -1070,7 +1125,8 @@ class vulkan_layer final : public Ilayer {
   }
 
   void draw_frame() {
-    imgui_wrapper::begin_frame();
+    imgui_begin_frame();
+
     if (get_app_context()->frame_buffer_resized) {
       _console->info("Frame buffer resized");
     }
@@ -1102,7 +1158,6 @@ class vulkan_layer final : public Ilayer {
 
     _command_buffers.at(_frame_index).reset();
 
-    ImGui::Render();
     record_command_buffer(image_index);
 
     vk::PipelineStageFlags wait_destination_stage(
@@ -1146,7 +1201,8 @@ class vulkan_layer final : public Ilayer {
   static inline vega_console _console            = console::create("Vulkan");
   static inline vega_console _validation_console = console::create("VulkanValidation");
 
-  bool _initialised = false;
+  bool _initialised       = false;
+  bool _imgui_initialised = false;
   vk::raii::Context _context;
   vk::raii::Instance _instance                      = nullptr;
   vk::raii::DebugUtilsMessengerEXT _debug_messenger = nullptr;
