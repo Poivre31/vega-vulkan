@@ -43,6 +43,8 @@ class sdl_layer final : public Ilayer {
     return true;
   }
 
+  void gui_update() noexcept final { imgui_begin_frame(); }
+
   void update(double dt) noexcept final {
     SDL_Event event{0};
     get_app_context()->mouse_data.dx = 0;
@@ -57,7 +59,7 @@ class sdl_layer final : public Ilayer {
           if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
             get_app_context()->running = false;
           } else if (event.key.scancode == SDL_SCANCODE_R && !event.key.repeat) {
-            get_app_context()->recompile_shaders = true;
+            get_app_context()->vulkan.recompile_shaders = true;
           }
           break;
 
@@ -75,7 +77,7 @@ class sdl_layer final : public Ilayer {
           get_app_context()->width  = event.window.data1;
           get_app_context()->height = event.window.data2;
 
-          get_app_context()->frame_buffer_resized = true;
+          get_app_context()->vulkan.recreate_swapchain = true;
           break;
 
         default:
@@ -85,7 +87,6 @@ class sdl_layer final : public Ilayer {
         ImGui_ImplSDL3_ProcessEvent(&event);
       }
     }
-    imgui_begin_frame();
   }
 
   void fixed_update(double ts) noexcept final {

@@ -28,8 +28,8 @@ void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
   ImGui_ImplSDL3_InitForVulkan(window);
-  auto format = VkFormat(vulkan_config::color_format);
-  auto depth  = VkFormat(vulkan_config::depth_format);
+  auto format = VkFormat(vulkan_config::swapchain.color_format);
+  auto depth  = VkFormat(vulkan_config::graphics_pipeline.depth_format);
   ImGui_ImplVulkan_InitInfo init_info{
       .Instance       = **vk_context.instance,
       .PhysicalDevice = **vk_context.physical_device,

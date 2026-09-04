@@ -34,7 +34,7 @@ class slang_layer final : public Ilayer {
   void update(double dt) noexcept final {
     const bool* key_states = SDL_GetKeyboardState(nullptr);
 
-    if (get_app_context()->recompile_shaders) {
+    if (get_app_context()->vulkan.recompile_shaders) {
       _console->info("Recompiling shaders...");
       if (!load_shaders()) {
         _console->error("Shader recompilation failed, keeping old pipeline");
@@ -42,7 +42,7 @@ class slang_layer final : public Ilayer {
       } else {
         get_app_context()->vulkan.recreate_graphics_pipeline = true;
       }
-      get_app_context()->recompile_shaders = false;
+      get_app_context()->vulkan.recompile_shaders = false;
     }
   }
   void cleanup() noexcept final {}

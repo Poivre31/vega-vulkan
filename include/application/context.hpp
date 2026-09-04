@@ -21,6 +21,7 @@ struct application_context {
   double last_fixed_update_time = 0.;
   double last_dt_window_time    = 0.;
   double fixed_time             = 0.;
+  bool reset_dt_history         = false;
 
   uint64_t frame       = 0;
   uint64_t fixed_frame = 0;
@@ -39,6 +40,4 @@ struct application_context {
   scene active_scene;
 
   std::vector<std::vector<char>> shader_modules;
-  bool recompile_shaders    = false;
-  bool frame_buffer_resized = false;
 };

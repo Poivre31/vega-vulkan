@@ -32,6 +32,5 @@ class ui_layer final : public Ilayer {
 int main() {
   application<ui_layer> app("App");
   app.run();
-  app.run();
   timer::print_all_elapsed_times(time_unit::millisecond);
 }

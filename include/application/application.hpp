@@ -34,7 +34,7 @@ class application {
     push_layer<sdl_layer>();
     push_layer<camera_layer>();
 
-    // (push_layer<layers>(), ...);
+    (push_layer<layers>(), ...);
 
     push_layer<slang_layer>();
     push_layer<vulkan_layer>();
@@ -89,16 +89,39 @@ class application {
       // TIMING
       if (_context.frame > 0) {
         _context.time = timer::get_elapsed_time("runtime");
-        _frame_times.push(_context.time);
-        while (_frame_times.back() - _frame_times.front()
-               > application_config::average_dt_window_length) {
-          _context.last_dt_window_time = _frame_times.front();
-          _frame_times.pop();
+
+        if (_context.reset_dt_history) {
+          auto last    = _frame_times.back();
+          _frame_times = {};
+          _frame_times.push(_context.time);
+          _context.reset_dt_history = false;
+        } else {
+          // _frame_times.push(_context.time);
+          // while (_frame_times.back() - _frame_times.front()
+          //        > application_config::average_dt_window_length) {
+          //   _context.last_dt_window_time = _frame_times.front();
+          //   _frame_times.pop();
+          // }
+          // assert(_frame_times.size() > 0);
+          // _context.avg_dt = (_frame_times.back() - _context.last_dt_window_time)
+          //                   / static_cast<double>(_frame_times.size());
+          _frame_times.push(_context.time);
+          while (_frame_times.back() - _frame_times.front()
+                     > application_config::average_dt_window_length
+                 && _frame_times.size() > 2) {
+            _frame_times.pop();
+          }
+          assert(_frame_times.size() > 1);
+          _context.avg_dt = (_frame_times.back() - _frame_times.front())
+                            / static_cast<double>(_frame_times.size() - 1);
         }
-        assert(_frame_times.size() > 0);
-        _context.avg_dt = (_frame_times.back() - _context.last_dt_window_time)
-                          / static_cast<double>(_frame_times.size());
-        delta_time      = timer::get_elapsed_time("frame-time", time_unit::second);
+
+        delta_time = timer::get_elapsed_time("frame-time", time_unit::second);
+      }
+
+      // GUI UPDATE
+      for (auto& layer : _layers) {
+        layer->gui_update();
       }
 
       // FRAME UPDATE

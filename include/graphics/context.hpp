@@ -16,9 +16,11 @@ struct vulkan_context {
   vk::raii::DescriptorPool* imgui_descriptor_pool = nullptr;
   vk::raii::DescriptorSets* descriptor_sets       = nullptr;
 
-  uint32_t image_count                  = 0;
-  vk::raii::Pipeline* graphics_pipeline = nullptr;
-
-  bool recreate_graphics_pipeline        = false;
+  uint32_t image_count{};
   vk::SampleCountFlags msaa_sample_count = vk::SampleCountFlagBits::e1;
+  vk::raii::Pipeline* graphics_pipeline  = nullptr;
+
+  bool recreate_swapchain         = false;
+  bool recreate_graphics_pipeline = false;
+  bool recompile_shaders          = false;
 };

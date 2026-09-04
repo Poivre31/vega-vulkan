@@ -122,8 +122,8 @@ inline vk::SurfaceFormatKHR get_swapchain_format(
 
   std::string error_message("Surface format choosed is not available, choose among:");
   for (const auto& format : available) {
-    if (format.format == vulkan_config::color_format
-        && format.colorSpace == vulkan_config::color_space) {
+    if (format.format == vulkan_config::swapchain.color_format
+        && format.colorSpace == vulkan_config::swapchain.color_space) {
       return format;
     }
     error_message += "\n  -" + vk::to_string(format.format) + " "
@@ -159,7 +159,7 @@ get_swapchain_extent(const vk::SurfaceCapabilitiesKHR& capabilities, SDL_Window*
 inline vk::PresentModeKHR
 get_present_mode(const vk::PhysicalDevice& physical_device, const vk::raii::SurfaceKHR& surface) {
   auto available = physical_device.getSurfacePresentModesKHR(*surface);
-  if (!vulkan_config::vsync) {
+  if (!vulkan_config::swapchain.vsync) {
     for (const auto& present_mode : available) {
       if (present_mode == vk::PresentModeKHR::eMailbox) {
         return vk::PresentModeKHR::eMailbox;
@@ -220,8 +220,8 @@ class vulkan_layer final : public Ilayer {
           .imgui_descriptor_pool = &_imgui_descriptor_pool,
           .descriptor_sets       = &_descriptor_sets,
           .image_count           = static_cast<uint32_t>(_swapchain_images.size()),
-          .graphics_pipeline     = &_graphics_pipeline,
           .msaa_sample_count     = _msaa_samples,
+          .graphics_pipeline     = &_graphics_pipeline,
       };
       imgui_init(get_app_context()->window, get_app_context()->vulkan);
       _imgui_initialised = true;
@@ -237,6 +237,19 @@ class vulkan_layer final : public Ilayer {
     return true;
   }
 
+  void gui_update() noexcept final {
+    ImGui::Begin("Vulkan settings");
+
+    ImGui::Text("Swapchain settings");
+    if (ImGui::Checkbox("VSync", &vulkan_config::swapchain.vsync)) {
+      get_app_context()->vulkan.recreate_swapchain = true;
+      get_app_context()->reset_dt_history          = true;
+    }
+
+    ImGui::Text("Pipeline settings");
+    ImGui::End();
+  }
+
   void update(double dt) noexcept final {
     if (!_initialised) {
       return;
@@ -244,7 +257,6 @@ class vulkan_layer final : public Ilayer {
     try {
       if (get_app_context()->vulkan.recreate_graphics_pipeline) {
         recreate_graphics_pipeline();
-        get_app_context()->vulkan.recreate_graphics_pipeline = false;
       }
 
       if (get_app_context()->active_camera) {
@@ -607,7 +619,7 @@ class vulkan_layer final : public Ilayer {
     _swapchain_extent = get_swapchain_extent(capabilities, get_app_context()->window);
 
     uint32_t requested_image_count = std::max(
-        vulkan_config::target_swapchain_image_count, capabilities.minImageCount
+        vulkan_config::swapchain.target_swapchain_image_count, capabilities.minImageCount
     );
     if (capabilities.maxImageCount != 0) {
       requested_image_count = std::min(requested_image_count, capabilities.maxImageCount);
@@ -674,7 +686,7 @@ class vulkan_layer final : public Ilayer {
       _color_image = create_image(
           _allocator,
           _device,
-          vulkan_config::color_format,
+          vulkan_config::swapchain.color_format,
           _swapchain_extent.width,
           _swapchain_extent.height,
           vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
@@ -700,6 +712,7 @@ class vulkan_layer final : public Ilayer {
       _depth_image.view  = nullptr;
       create_swapchain();
       create_depth_resources();
+      get_app_context()->vulkan.recreate_swapchain = false;
     } catch (...) {
       handle_exception("swapchain recreation");
       cleanup();
@@ -857,7 +870,7 @@ class vulkan_layer final : public Ilayer {
     vk::PipelineRenderingCreateInfo pipeline_rendering_info{
         .colorAttachmentCount    = 1,
         .pColorAttachmentFormats = &_swapchain_format.format,
-        .depthAttachmentFormat   = vulkan_config::depth_format
+        .depthAttachmentFormat   = vulkan_config::graphics_pipeline.depth_format
     };
 
     vk::StructureChain<
@@ -881,6 +894,7 @@ class vulkan_layer final : public Ilayer {
       _device.waitIdle();
       _graphics_pipeline = nullptr;
       create_graphics_pipeline();
+      get_app_context()->vulkan.recreate_graphics_pipeline = false;
     } catch (...) {
       handle_exception("graphics pipeline recreation");
       cleanup();
@@ -902,7 +916,7 @@ class vulkan_layer final : public Ilayer {
     _depth_image = create_image(
         _allocator,
         _device,
-        vulkan_config::depth_format,
+        vulkan_config::graphics_pipeline.depth_format,
         _swapchain_extent.width,
         _swapchain_extent.height,
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
@@ -1129,10 +1143,6 @@ class vulkan_layer final : public Ilayer {
   }
 
   void draw_frame() {
-    if (get_app_context()->frame_buffer_resized) {
-      _console->info("Frame buffer resized");
-    }
-
     auto fence_result = _device.waitForFences(
         *_draw_fences.at(_frame_index), vk::True, std::numeric_limits<uint64_t>::max()
     );
@@ -1150,7 +1160,6 @@ class vulkan_layer final : public Ilayer {
       vk::SemaphoreCreateInfo semaphore_info{};
       _presentation_semaphores.at(_frame_index) = vk::raii::Semaphore(_device, semaphore_info);
       recreate_swapchain();
-      get_app_context()->frame_buffer_resized = false;
       return;
     } else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
       throw std::runtime_error("Swap chain image acquisition failed: " + vk::to_string(result));
@@ -1189,9 +1198,8 @@ class vulkan_layer final : public Ilayer {
     result = _graphics_queue.presentKHR(presentInfo);
 
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR
-        || get_app_context()->frame_buffer_resized) {
+        || get_app_context()->vulkan.recreate_swapchain) {
       recreate_swapchain();
-      get_app_context()->frame_buffer_resized = false;
     } else if (result != vk::Result::eSuccess) {
       throw std::runtime_error("Graphics queue presentation failed: " + vk::to_string(result));
     }
