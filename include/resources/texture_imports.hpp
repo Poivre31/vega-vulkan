@@ -9,29 +9,16 @@ struct texture_info {
   channels target_channels = channels::RGBA;
 };
 
-// std::vector<handle<gpu_image>>
-// upload_textures(application_context* context, std::vector<stb_image>&& cpu_textures) {
-//   auto textures = std::move(cpu_textures);
-//   std::vector<handle<gpu_image>> indices;
-//   for (auto& image : textures) {
-//     auto handle = context->resources.textures.push(
-//         std::move(load_texture_to_gpu(context->vulkan, std::move(image)))
-//     );
-//     indices.push_back(handle);
-//   }
-//   return indices;
-// }
-
 namespace textures {
 
 const texture_info beer{
     .texture_path   = "resources/textures/beer.png",
-    .enable_mipmaps = false,  // MOVE TO SAMPLER SETTING
+    .enable_mipmaps = false,
 };
 
 const texture_info viking{
     .texture_path   = "resources/textures/viking_room.png",
-    .enable_mipmaps = false,  // MOVE TO SAMPLER SETTING
+    .enable_mipmaps = true,
 };
 
 }  // namespace textures

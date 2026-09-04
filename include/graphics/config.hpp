@@ -3,6 +3,8 @@
 #include "graphics.hpp"
 #include "vulkan/vulkan.hpp"
 
+struct vk_config {};
+
 namespace vulkan_config {
 
 const vk::ApplicationInfo vulkan_info{

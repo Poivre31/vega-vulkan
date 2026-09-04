@@ -6,7 +6,8 @@
 #include <console/console.hpp>
 #include <timer/timer.hpp>
 
-#include "imgui_impl_sdl3.h"
+#include "graphics/imgui_impl.hpp"
+
 #include "layer.hpp"
 #include "config.hpp"
 
@@ -84,6 +85,7 @@ class sdl_layer final : public Ilayer {
         ImGui_ImplSDL3_ProcessEvent(&event);
       }
     }
+    imgui_begin_frame();
   }
 
   void fixed_update(double ts) noexcept final {

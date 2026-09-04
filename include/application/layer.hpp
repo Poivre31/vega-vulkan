@@ -20,10 +20,12 @@ class Ilayer {
   Ilayer& operator=(const Ilayer&) = default;
   Ilayer& operator=(Ilayer&&)      = default;
 
-  virtual bool init() noexcept            = 0;
-  virtual void update(double dt) noexcept = 0;
+  virtual bool init() noexcept { return true; };
+  virtual void gui_update() noexcept {};
+  virtual void update(double dt) noexcept {};
   virtual void fixed_update(double time_step) noexcept {};
-  virtual void cleanup() noexcept = 0;
+  virtual void frame_render() noexcept {};
+  virtual void cleanup() noexcept {};
 
   [[nodiscard]] application_context* get_app_context() const noexcept { return _context; }
 

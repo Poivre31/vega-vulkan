@@ -34,14 +34,22 @@ struct scene_resources {
 class scene {
  public:
   scene() = default;
-  ~scene() { clear(); }
+  ~scene() {
+    if (_initialised) {
+      console::get(consoles::graphics)
+          ->error(
+              "Destroying a scene that is still initialised, always call clear(vulkan_context) "
+              "before destroying a scene"
+          );
+    }
+  }
 
   scene(const scene&)            = delete;
   scene(scene&&)                 = delete;
   scene& operator=(const scene&) = delete;
   scene& operator=(scene&&)      = delete;
 
-  void init(vulkan_context vk_context) {
+  void init(vulkan_context& vk_context) {
     _resources.nearest_sampler = simple_sampler(
         vk_context, false, vk::SamplerAddressMode::eRepeat, 0.F
     );
@@ -79,7 +87,7 @@ class scene {
 
     if (!info.mesh.valid) {
       auto [vertices, obj_materials] = load_object(
-          info.object_folder + info.mesh_name, info.scale, info.z_is_up
+          info.object_folder + info.mesh_name, info.scale, info.z_is_up, info.reverse_front_face
       );
 
       if (!obj_materials.empty()) {
@@ -133,7 +141,7 @@ class scene {
 
     if (!info.mesh.valid) {
       auto [vertices, _] = load_object(
-          info.object_folder + info.mesh_name, info.scale, info.z_is_up
+          info.object_folder + info.mesh_name, info.scale, info.z_is_up, info.reverse_front_face
       );
 
       for (auto& vertex : vertices) {
@@ -229,13 +237,16 @@ class scene {
     }
   }
 
-  void clear() {
+  void clear(vulkan_context& vk_context) {
+    vk_context.device->waitIdle();
     _resources.meshes.clear();
     _resources.materials.clear();
     _resources.textures.clear();
     _resources.nearest_sampler = nullptr;
     _resources.linear_sampler  = nullptr;
     _resources.material_buffer = nullptr;
+
+    _initialised = false;
   }
 
  private:

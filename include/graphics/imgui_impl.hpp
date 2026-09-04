@@ -2,11 +2,11 @@
 
 #include <SDL3/SDL_video.h>
 #include <cstddef>
-#include <stdexcept>
-#include "application/context.hpp"
+#include <console/console.hpp>
 
 #include "graphics/config.hpp"
 #include "graphics/context.hpp"
+
 #define IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
@@ -81,4 +81,5 @@ void imgui_cleanup() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
+  console::get(consoles::graphics)->info("Cleaned-up ImGui");
 }

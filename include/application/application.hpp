@@ -33,13 +33,14 @@ class application {
     _console = console::create(_name);
     push_layer<sdl_layer>();
     push_layer<camera_layer>();
+
+    // (push_layer<layers>(), ...);
+
     push_layer<slang_layer>();
     push_layer<vulkan_layer>();
     push_layer<assets_layer>();
-    (push_layer<layers>(), ...);
   }
   ~application() {
-    _context.active_scene.clear();
     while (!_layers.empty()) {
       _layers.pop_back();
     }
@@ -119,7 +120,10 @@ class application {
 
       _context.frame++;
     }
+    timer::destroy("frame-time");
+    timer::destroy("runtime");
 
+    _context.active_scene.clear(_context.vulkan);
     for (auto& layer : _layers) {
       layer->cleanup();
     }

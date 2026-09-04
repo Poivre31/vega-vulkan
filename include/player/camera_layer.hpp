@@ -69,7 +69,6 @@ class camera_layer final : public Ilayer {
     get_app_context()->active_camera = _active_camera;
   }
   void fixed_update(double time_step) noexcept final { auto pos = _active_camera->get_position(); }
-  void cleanup() noexcept final {}
 
  private:
   std::vector<Camera> _cameras;

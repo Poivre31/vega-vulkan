@@ -8,8 +8,12 @@
 #include "tiny_obj_loader.h"
 #include "mesh.hpp"
 
-std::pair<std::vector<vertex_3D>, std::vector<tinyobj::material_t>>
-load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = true) {  // NOLINT
+std::pair<std::vector<vertex_3D>, std::vector<tinyobj::material_t>> load_object(
+    const std::string& model_path,
+    float scale,
+    bool z_is_up,
+    bool reverse_front_face
+) {  // NOLINT
   auto timer   = scoped_timer("object-loading");
   bool silence = false;
   try {
@@ -66,7 +70,9 @@ load_object(const std::string& model_path, float scale = 1.F, bool z_is_up = tru
         bool create_face_normals = false;
         std::array<vertex_3D, 3> face_vertices{};
         for (size_t v = 0; v < number_face_vertices; v++) {
-          tinyobj::index_t idx = shape.mesh.indices[shape_offset + v];
+          tinyobj::index_t idx =
+              reverse_front_face ? shape.mesh.indices[shape_offset + number_face_vertices - 1 - v]
+                                 : shape.mesh.indices[shape_offset + v];
           face_vertices.at(v).position.x =
               attrib.vertices[3 * static_cast<size_t>(idx.vertex_index) + x_offset] * scale;
           face_vertices.at(v).position.y =

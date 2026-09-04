@@ -55,6 +55,65 @@ inline bool is_device_suitable(const vk::raii::PhysicalDevice& device) {
   return true;
 }
 
+inline void check_physical_device_features(vk::raii::PhysicalDevice& physical_device) {
+  auto features = physical_device.template getFeatures2<
+      vk::PhysicalDeviceFeatures2,
+      vk::PhysicalDeviceVulkan11Features,
+      vk::PhysicalDeviceVulkan12Features,
+      vk::PhysicalDeviceVulkan13Features,
+      vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+
+  if (!features.template get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'sample shading rate', exiting"
+    );
+  }
+  if (!features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy) {
+    throw std::runtime_error("Selected physical device doesn't support 'anisotropy', exiting");
+  }
+  if (!features.template get<vk::PhysicalDeviceFeatures2>().features.shaderInt64) {
+    throw std::runtime_error("Selected physical device doesn't support '64bit int', exiting");
+  }
+  if (!features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'shader draw parameters', exiting"
+    );
+  }
+  if (!features.template get<vk::PhysicalDeviceVulkan12Features>()
+           .shaderSampledImageArrayNonUniformIndexing) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'sampled image array non uniform indexing', "
+        "exiting"
+    );
+  }
+  if (!features.template get<vk::PhysicalDeviceVulkan12Features>().runtimeDescriptorArray) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'runtime descriptor array', exiting"
+    );
+  }
+  if (!features.template get<vk::PhysicalDeviceVulkan12Features>().bufferDeviceAddress) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'buffer device adress', exiting"
+    );
+  }
+  if (!features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'dynamic rendering', exiting"
+    );
+  }
+  if (!features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'synchronization 2', exiting"
+    );
+  }
+  if (!features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>()
+           .extendedDynamicState) {
+    throw std::runtime_error(
+        "Selected physical device doesn't support 'extended dynamic state', exiting"
+    );
+  }
+}
+
 inline vk::SurfaceFormatKHR get_swapchain_format(
     const vk::raii::PhysicalDevice& physical_device,
     const vk::raii::SurfaceKHR& surface
@@ -117,8 +176,8 @@ get_present_mode(const vk::PhysicalDevice& physical_device, const vk::raii::Surf
 
 struct PushConstants {
   glm::mat4x4 view_projection_matrix{};
-  vk::DeviceAddress material_buffer;
-  uint32_t material_count;
+  vk::DeviceAddress material_buffer{};
+  uint32_t material_count{};
   float time{};
 };
 
@@ -127,6 +186,12 @@ class vulkan_layer final : public Ilayer {
   using Ilayer::Ilayer;
 
   bool init() noexcept final {
+    if (_instance_running) {
+      _console->error(
+          "A vulkan instance has aleady been initialised, canceling current initialisation"
+      );
+      return false;
+    }
     try {
       create_instance();
       setup_console_callback();
@@ -164,7 +229,8 @@ class vulkan_layer final : public Ilayer {
       handle_exception("initialisation");
       return false;
     }
-    _initialised = true;
+    _initialised      = true;
+    _instance_running = true;
 
     _console->info("Vulkan was successfully initialised");
 
@@ -210,8 +276,13 @@ class vulkan_layer final : public Ilayer {
     if (_imgui_initialised) {
       imgui_cleanup();
     }
+    *this = vulkan_layer(get_app_context());
+
+    _instance_running  = false;
     _initialised       = false;
     _imgui_initialised = false;
+    // *this              = vulkan_layer(get_app_context());
+    console::get(consoles::graphics)->info("Cleaned-up Vulkan");
   }
 
   static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
@@ -249,14 +320,6 @@ class vulkan_layer final : public Ilayer {
   }
 
   void create_instance() {
-    if (_instance_running) {
-      _console->error(
-          "A Vulkan instance has already been created but Vega can only handle one at a time. "
-          "Returning from initialisation."
-      );
-      return;
-    }
-
     _context = vk::raii::Context();
 
     // SELECTING EXTENSIONS
@@ -317,8 +380,6 @@ class vulkan_layer final : public Ilayer {
     if (!*_instance) {
       throw std::runtime_error("Instance creation silently failed");
     }
-
-    _instance_running = true;
   }
 
   void setup_console_callback() {
@@ -410,62 +471,7 @@ class vulkan_layer final : public Ilayer {
         vk::to_string(device_properties.deviceType)
     );
 
-    auto features = _physical_device.template getFeatures2<
-        vk::PhysicalDeviceFeatures2,
-        vk::PhysicalDeviceVulkan11Features,
-        vk::PhysicalDeviceVulkan12Features,
-        vk::PhysicalDeviceVulkan13Features,
-        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
-
-    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'sample shading rate', exiting"
-      );
-    }
-    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy) {
-      throw std::runtime_error("Selected physical device doesn't support 'anisotropy', exiting");
-    }
-    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.shaderInt64) {
-      throw std::runtime_error("Selected physical device doesn't support '64bit int', exiting");
-    }
-    if (!features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'shader draw parameters', exiting"
-      );
-    }
-    if (!features.template get<vk::PhysicalDeviceVulkan12Features>()
-             .shaderSampledImageArrayNonUniformIndexing) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'sampled image array non uniform indexing', "
-          "exiting"
-      );
-    }
-    if (!features.template get<vk::PhysicalDeviceVulkan12Features>().runtimeDescriptorArray) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'runtime descriptor array', exiting"
-      );
-    }
-    if (!features.template get<vk::PhysicalDeviceVulkan12Features>().bufferDeviceAddress) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'buffer device adress', exiting"
-      );
-    }
-    if (!features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'dynamic rendering', exiting"
-      );
-    }
-    if (!features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'synchronization 2', exiting"
-      );
-    }
-    if (!features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>()
-             .extendedDynamicState) {
-      throw std::runtime_error(
-          "Selected physical device doesn't support 'extended dynamic state', exiting"
-      );
-    }
+    check_physical_device_features(_physical_device);
 
     if (device_properties.limits.maxDescriptorSetSamplers < vulkan_config::max_number_of_textures) {
       throw std::runtime_error(
@@ -696,8 +702,7 @@ class vulkan_layer final : public Ilayer {
       create_depth_resources();
     } catch (...) {
       handle_exception("swapchain recreation");
-      _initialised       = false;
-      _imgui_initialised = false;
+      cleanup();
     }
   }
 
@@ -878,8 +883,7 @@ class vulkan_layer final : public Ilayer {
       create_graphics_pipeline();
     } catch (...) {
       handle_exception("graphics pipeline recreation");
-      _initialised       = false;
-      _imgui_initialised = false;
+      cleanup();
     }
   }
 
@@ -1125,8 +1129,6 @@ class vulkan_layer final : public Ilayer {
   }
 
   void draw_frame() {
-    imgui_begin_frame();
-
     if (get_app_context()->frame_buffer_resized) {
       _console->info("Frame buffer resized");
     }
