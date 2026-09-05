@@ -1,8 +1,9 @@
 #pragma once
 
 #include <cstdint>
+
 #include "graphics.hpp"
-#include "vulkan/vulkan.hpp"
+#include "config.hpp"
 
 struct vulkan_context {
   vk::raii::Instance* instance              = nullptr;
@@ -16,11 +17,12 @@ struct vulkan_context {
   vk::raii::DescriptorPool* imgui_descriptor_pool = nullptr;
   vk::raii::DescriptorSets* descriptor_sets       = nullptr;
 
-  uint32_t image_count{};
-  vk::SampleCountFlags msaa_sample_count = vk::SampleCountFlagBits::e1;
-  vk::raii::Pipeline* graphics_pipeline  = nullptr;
+  vk::raii::Pipeline* graphics_pipeline = nullptr;
+
+  dynamic_config config{};
 
   bool recreate_swapchain         = false;
   bool recreate_graphics_pipeline = false;
+  bool update_imgui               = false;
   bool recompile_shaders          = false;
 };

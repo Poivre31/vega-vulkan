@@ -21,159 +21,6 @@
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_to_string.hpp"
 
-inline bool is_device_suitable(const vk::raii::PhysicalDevice& device) {
-  auto device_properties = device.getProperties();
-  auto device_features   = device.getFeatures();
-
-  if (device_properties.apiVersion < vk::ApiVersion13) {
-    return false;
-  }
-
-  auto available_queue_families = device.getQueueFamilyProperties();
-  if (std::none_of(// NOLINT
-          available_queue_families.begin(),
-          available_queue_families.end(),
-          [](auto const& queue_properties) {
-            return queue_properties.queueFlags & vk::QueueFlagBits::eGraphics;
-          }
-      )) {
-    return false;
-  }
-
-  auto available_device_extensions = device.enumerateDeviceExtensionProperties();
-
-  for (const auto* extension : vulkan_config::requested_device_extensions) {
-    if (std::ranges::none_of(
-            available_device_extensions, [extension](auto const& avaibleExtension) {
-              return strcmp(avaibleExtension.extensionName, extension) == 0;
-            }
-        )) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-inline void check_physical_device_features(vk::raii::PhysicalDevice& physical_device) {
-  auto features = physical_device.template getFeatures2<
-      vk::PhysicalDeviceFeatures2,
-      vk::PhysicalDeviceVulkan11Features,
-      vk::PhysicalDeviceVulkan12Features,
-      vk::PhysicalDeviceVulkan13Features,
-      vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
-
-  if (!features.template get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'sample shading rate', exiting"
-    );
-  }
-  if (!features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy) {
-    throw std::runtime_error("Selected physical device doesn't support 'anisotropy', exiting");
-  }
-  if (!features.template get<vk::PhysicalDeviceFeatures2>().features.shaderInt64) {
-    throw std::runtime_error("Selected physical device doesn't support '64bit int', exiting");
-  }
-  if (!features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'shader draw parameters', exiting"
-    );
-  }
-  if (!features.template get<vk::PhysicalDeviceVulkan12Features>()
-           .shaderSampledImageArrayNonUniformIndexing) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'sampled image array non uniform indexing', "
-        "exiting"
-    );
-  }
-  if (!features.template get<vk::PhysicalDeviceVulkan12Features>().runtimeDescriptorArray) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'runtime descriptor array', exiting"
-    );
-  }
-  if (!features.template get<vk::PhysicalDeviceVulkan12Features>().bufferDeviceAddress) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'buffer device adress', exiting"
-    );
-  }
-  if (!features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'dynamic rendering', exiting"
-    );
-  }
-  if (!features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'synchronization 2', exiting"
-    );
-  }
-  if (!features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>()
-           .extendedDynamicState) {
-    throw std::runtime_error(
-        "Selected physical device doesn't support 'extended dynamic state', exiting"
-    );
-  }
-}
-
-inline vk::SurfaceFormatKHR get_swapchain_format(
-    const vk::raii::PhysicalDevice& physical_device,
-    const vk::raii::SurfaceKHR& surface
-) {
-  auto available = physical_device.getSurfaceFormatsKHR(*surface);
-
-  std::string error_message("Surface format choosed is not available, choose among:");
-  for (const auto& format : available) {
-    if (format.format == vulkan_config::swapchain.color_format
-        && format.colorSpace == vulkan_config::swapchain.color_space) {
-      return format;
-    }
-    error_message += "\n  -" + vk::to_string(format.format) + " "
-                     + vk::to_string(format.colorSpace);
-  }
-
-  throw std::runtime_error(error_message);
-}
-
-inline vk::Extent2D
-get_swapchain_extent(const vk::SurfaceCapabilitiesKHR& capabilities, SDL_Window* window) {
-  if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-    return capabilities.currentExtent;
-  }
-
-  int width = 0, height = 0;
-  SDL_GetWindowSizeInPixels(window, &width, &height);
-
-  return {
-      .width = std::clamp(
-          static_cast<uint32_t>(width),
-          capabilities.minImageExtent.width,
-          capabilities.maxImageExtent.width
-      ),
-      .height = std::clamp(
-          static_cast<uint32_t>(height),
-          capabilities.minImageExtent.height,
-          capabilities.maxImageExtent.height
-      )
-  };
-}
-
-inline vk::PresentModeKHR
-get_present_mode(const vk::PhysicalDevice& physical_device, const vk::raii::SurfaceKHR& surface) {
-  auto available = physical_device.getSurfacePresentModesKHR(*surface);
-  if (!vulkan_config::swapchain.vsync) {
-    for (const auto& present_mode : available) {
-      if (present_mode == vk::PresentModeKHR::eMailbox) {
-        return vk::PresentModeKHR::eMailbox;
-      }
-    }
-    for (const auto& present_mode : available) {
-      if (present_mode == vk::PresentModeKHR::eImmediate) {
-        return vk::PresentModeKHR::eImmediate;
-      }
-    }
-  }
-  return vk::PresentModeKHR::eFifo;
-}
-
 struct PushConstants {
   glm::mat4x4 view_projection_matrix{};
   vk::DeviceAddress material_buffer{};
@@ -193,6 +40,8 @@ class vulkan_layer final : public Ilayer {
       return false;
     }
     try {
+      _vk_context = &get_app_context()->vulkan;
+
       create_instance();
       setup_console_callback();
       create_surface();
@@ -209,21 +58,18 @@ class vulkan_layer final : public Ilayer {
       create_command_buffer();
       create_synchronisation_objects();
 
-      get_app_context()->vulkan = {
-          .instance              = &_instance,
-          .physical_device       = &_physical_device,
-          .graphics_queue_family = _graphics_queue_family,
-          .graphics_queue        = &_graphics_queue,
-          .device                = &_device,
-          .allocator             = &_allocator,
-          .command_pool          = &_command_pool,
-          .imgui_descriptor_pool = &_imgui_descriptor_pool,
-          .descriptor_sets       = &_descriptor_sets,
-          .image_count           = static_cast<uint32_t>(_swapchain_images.size()),
-          .msaa_sample_count     = _msaa_samples,
-          .graphics_pipeline     = &_graphics_pipeline,
-      };
-      imgui_init(get_app_context()->window, get_app_context()->vulkan);
+      _vk_context->instance              = &_instance;
+      _vk_context->physical_device       = &_physical_device;
+      _vk_context->graphics_queue_family = _graphics_queue_family;
+      _vk_context->graphics_queue        = &_graphics_queue;
+      _vk_context->device                = &_device;
+      _vk_context->allocator             = &_allocator;
+      _vk_context->command_pool          = &_command_pool;
+      _vk_context->imgui_descriptor_pool = &_imgui_descriptor_pool;
+      _vk_context->descriptor_sets       = &_descriptor_sets;
+      _vk_context->graphics_pipeline     = &_graphics_pipeline;
+
+      imgui_init(get_app_context()->window, *_vk_context);
       _imgui_initialised = true;
     } catch (...) {
       handle_exception("initialisation");
@@ -241,13 +87,65 @@ class vulkan_layer final : public Ilayer {
     ImGui::Begin("Vulkan settings");
 
     ImGui::Text("Swapchain settings");
-    if (ImGui::Checkbox("VSync", &vulkan_config::swapchain.vsync)) {
-      get_app_context()->vulkan.recreate_swapchain = true;
-      get_app_context()->reset_dt_history          = true;
+    if (ImGui::Checkbox("VSync", &_vk_context->config.vsync)) {
+      _vk_context->recreate_swapchain     = true;
+      get_app_context()->reset_dt_history = true;
     }
 
+    ImGui::Text("Swapchain size");
+    static int swapchain_size = int(_vk_context->config.swapchain_image_count);
+    if (ImGui::SliderInt(
+            "##swapchain size",
+            &swapchain_size,
+            int(_vk_context->config.min_swapchain_image_count),
+            int(_vk_context->config.max_swapchain_image_count)
+        )) {
+      _vk_context->config.swapchain_image_count = swapchain_size;
+      _vk_context->recreate_swapchain           = true;
+      _vk_context->update_imgui                 = true;
+    }
+
+    ImGui::Text("MSAA sample count :");
+    if (ImGui::BeginCombo(
+            "##msaa count", vk::to_string(_vk_context->config.msaa_sample_count).data()
+        )) {
+      for (auto& count : _vk_context->config.available_msaa_sample_counts) {
+        bool is_selected = (_vk_context->config.msaa_sample_count == count);
+        if (ImGui::Selectable(vk::to_string(count).data(), is_selected)) {
+          _vk_context->config.msaa_sample_count   = count;
+          _vk_context->recreate_swapchain         = true;
+          _vk_context->recreate_graphics_pipeline = true;
+          _vk_context->update_imgui               = true;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    ImGui::Text("MSAA shading rate :");
+    if (ImGui::SliderFloat("##msaa rate", &_vk_context->config.msaa_shading_rate, 0.F, 1.F)) {
+      _vk_context->recreate_graphics_pipeline = true;
+    }
+
+    ImGui::Separator();
     ImGui::Text("Pipeline settings");
+
+    ImGui::Text("Clear color :");
+    ImGui::ColorEdit4("##clear color", reinterpret_cast<float*>(&_vk_context->config.clear_color));
+
     ImGui::End();
+
+    if (_vk_context->recreate_swapchain) {
+      recreate_swapchain();
+    }
+    if (_vk_context->recreate_graphics_pipeline) {
+      recreate_graphics_pipeline();
+    }
+    if (_vk_context->update_imgui) {
+      imgui_update_vulkan(get_app_context()->window, *_vk_context);
+    }
   }
 
   void update(double dt) noexcept final {
@@ -255,10 +153,6 @@ class vulkan_layer final : public Ilayer {
       return;
     }
     try {
-      if (get_app_context()->vulkan.recreate_graphics_pipeline) {
-        recreate_graphics_pipeline();
-      }
-
       if (get_app_context()->active_camera) {
         _push_constants.view_projection_matrix =
             get_app_context()->active_camera->get_view_projection_matrix();
@@ -268,13 +162,12 @@ class vulkan_layer final : public Ilayer {
       }
 
       _push_constants.material_buffer =
-          get_app_context()->active_scene.resources()->material_buffer.get_adress(
-              get_app_context()->vulkan
-          );
+          get_app_context()->active_scene.resources()->material_buffer.get_adress(*_vk_context);
       _push_constants.material_count = get_app_context()->active_scene.materials()->size();
       _push_constants.time           = static_cast<float>(timer::get_elapsed_time());
 
       draw_frame();
+
     } catch (...) {
       handle_exception("update");
       std::abort();
@@ -329,6 +222,154 @@ class vulkan_layer final : public Ilayer {
     } catch (...) {
       _console->error("Unknown error during Vulkan {}", context);
     }
+  }
+
+  static bool is_device_suitable(const vk::raii::PhysicalDevice& device) {
+    auto device_properties = device.getProperties();
+    auto device_features   = device.getFeatures();
+
+    if (device_properties.apiVersion < vk::ApiVersion13) {
+      return false;
+    }
+
+    auto available_queue_families = device.getQueueFamilyProperties();
+    if (std::none_of(// NOLINT
+          available_queue_families.begin(),
+          available_queue_families.end(),
+          [](auto const& queue_properties) {
+            return queue_properties.queueFlags & vk::QueueFlagBits::eGraphics;
+          }
+      )) {
+      return false;
+    }
+
+    auto available_device_extensions = device.enumerateDeviceExtensionProperties();
+
+    for (const auto* extension : vulkan_config::requested_device_extensions) {
+      if (std::ranges::none_of(
+              available_device_extensions, [extension](auto const& avaibleExtension) {
+                return strcmp(avaibleExtension.extensionName, extension) == 0;
+              }
+          )) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  void check_physical_device_features() {
+    auto features = _physical_device.template getFeatures2<
+        vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan11Features,
+        vk::PhysicalDeviceVulkan12Features,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+
+    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'sample shading rate', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy) {
+      throw std::runtime_error("Selected physical device doesn't support 'anisotropy', exiting");
+    }
+    if (!features.template get<vk::PhysicalDeviceFeatures2>().features.shaderInt64) {
+      throw std::runtime_error("Selected physical device doesn't support '64bit int', exiting");
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'shader draw parameters', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan12Features>()
+             .shaderSampledImageArrayNonUniformIndexing) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'sampled image array non uniform indexing', "
+          "exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan12Features>().runtimeDescriptorArray) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'runtime descriptor array', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan12Features>().bufferDeviceAddress) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'buffer device adress', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'dynamic rendering', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'synchronization 2', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>()
+             .extendedDynamicState) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'extended dynamic state', exiting"
+      );
+    }
+  }
+
+  vk::SurfaceFormatKHR get_swapchain_format() {
+    auto available = _physical_device.getSurfaceFormatsKHR(*_surface);
+
+    std::string error_message("Surface format choosed is not available, choose among:");
+    for (const auto& format : available) {
+      if (format.format == _vk_context->config.color_format
+          && format.colorSpace == _vk_context->config.color_space) {
+        return format;
+      }
+      error_message += "\n  -" + vk::to_string(format.format) + " "
+                       + vk::to_string(format.colorSpace);
+    }
+
+    throw std::runtime_error(error_message);
+  }
+
+  vk::Extent2D get_swapchain_extent(const vk::SurfaceCapabilitiesKHR& capabilities) {
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+      return capabilities.currentExtent;
+    }
+
+    int width = 0, height = 0;
+    SDL_GetWindowSizeInPixels(get_app_context()->window, &width, &height);
+
+    return {
+        .width = std::clamp(
+            static_cast<uint32_t>(width),
+            capabilities.minImageExtent.width,
+            capabilities.maxImageExtent.width
+        ),
+        .height = std::clamp(
+            static_cast<uint32_t>(height),
+            capabilities.minImageExtent.height,
+            capabilities.maxImageExtent.height
+        )
+    };
+  }
+
+  vk::PresentModeKHR get_present_mode() {
+    auto available = _physical_device.getSurfacePresentModesKHR(*_surface);
+    if (!_vk_context->config.vsync) {
+      for (const auto& present_mode : available) {
+        if (present_mode == vk::PresentModeKHR::eMailbox) {
+          return vk::PresentModeKHR::eMailbox;
+        }
+      }
+      for (const auto& present_mode : available) {
+        if (present_mode == vk::PresentModeKHR::eImmediate) {
+          return vk::PresentModeKHR::eImmediate;
+        }
+      }
+    }
+    return vk::PresentModeKHR::eFifo;
   }
 
   void create_instance() {
@@ -483,7 +524,7 @@ class vulkan_layer final : public Ilayer {
         vk::to_string(device_properties.deviceType)
     );
 
-    check_physical_device_features(_physical_device);
+    check_physical_device_features();
 
     if (device_properties.limits.maxDescriptorSetSamplers < vulkan_config::max_number_of_textures) {
       throw std::runtime_error(
@@ -499,37 +540,44 @@ class vulkan_layer final : public Ilayer {
     // CHOOSE MSAA SAMPLES
     vk::SampleCountFlags counts = device_properties.limits.framebufferColorSampleCounts
                                   & device_properties.limits.framebufferDepthSampleCounts;
+    for (int i = 6; i >= 0; i--) {
+      if (counts & vk::SampleCountFlagBits(1 << i)) {
+        _vk_context->config.available_msaa_sample_counts.emplace_back(
+            vk::SampleCountFlagBits(1 << i)
+        );
+      }
+    }
     if (counts & vk::SampleCountFlagBits::e64
-        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e64) {
-      _msaa_samples = vk::SampleCountFlagBits::e64;
+        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e64) {
+      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e64;
       return;
     }
     if (counts & vk::SampleCountFlagBits::e32
-        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e32) {
-      _msaa_samples = vk::SampleCountFlagBits::e32;
+        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e32) {
+      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e32;
       return;
     }
     if (counts & vk::SampleCountFlagBits::e16
-        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e16) {
-      _msaa_samples = vk::SampleCountFlagBits::e16;
+        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e16) {
+      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e16;
       return;
     }
     if (counts & vk::SampleCountFlagBits::e8
-        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e8) {
-      _msaa_samples = vk::SampleCountFlagBits::e8;
+        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e8) {
+      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e8;
       return;
     }
     if (counts & vk::SampleCountFlagBits::e4
-        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e4) {
-      _msaa_samples = vk::SampleCountFlagBits::e4;
+        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e4) {
+      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e4;
       return;
     }
     if (counts & vk::SampleCountFlagBits::e2
-        && vulkan_config::target_msaa_sample_count >= vk::SampleCountFlagBits::e2) {
-      _msaa_samples = vk::SampleCountFlagBits::e2;
+        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e2) {
+      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e2;
       return;
     }
-    _msaa_samples = vk::SampleCountFlagBits::e1;
+    _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e1;
   }
 
   void create_logical_device() {
@@ -615,17 +663,20 @@ class vulkan_layer final : public Ilayer {
   void create_swapchain() {
     // CREATING SWAPCHAIN
     auto capabilities = _physical_device.getSurfaceCapabilitiesKHR(*_surface);
-    _swapchain_format = get_swapchain_format(_physical_device, _surface);
-    _swapchain_extent = get_swapchain_extent(capabilities, get_app_context()->window);
+    _swapchain_format = get_swapchain_format();
+    _swapchain_extent = get_swapchain_extent(capabilities);
 
     uint32_t requested_image_count = std::max(
-        vulkan_config::swapchain.target_swapchain_image_count, capabilities.minImageCount
+        _vk_context->config.swapchain_image_count, capabilities.minImageCount
     );
     if (capabilities.maxImageCount != 0) {
       requested_image_count = std::min(requested_image_count, capabilities.maxImageCount);
     }
+    _vk_context->config.min_swapchain_image_count = capabilities.minImageCount;
+    _vk_context->config.max_swapchain_image_count = std::min(capabilities.maxImageCount, 5U);
+    _vk_context->config.swapchain_image_count     = requested_image_count;
 
-    auto present_mode = get_present_mode(_physical_device, _surface);
+    auto present_mode = get_present_mode();
     if (present_mode == vk::PresentModeKHR::eImmediate) {
       _console->warn(
           "Vsync is disabled and MailBox presentation mode is not available, choosed Immediate "
@@ -682,18 +733,18 @@ class vulkan_layer final : public Ilayer {
     }
 
     // MULTISAMPLING IMAGE
-    if (_msaa_samples != vk::SampleCountFlagBits::e1) {
+    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
       _color_image = create_image(
           _allocator,
           _device,
-          vulkan_config::swapchain.color_format,
+          _vk_context->config.color_format,
           _swapchain_extent.width,
           _swapchain_extent.height,
           vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
           vk::ImageAspectFlagBits::eColor,
           false,
           1,
-          _msaa_samples
+          _vk_context->config.msaa_sample_count
       );
     }
   }
@@ -712,7 +763,7 @@ class vulkan_layer final : public Ilayer {
       _depth_image.view  = nullptr;
       create_swapchain();
       create_depth_resources();
-      get_app_context()->vulkan.recreate_swapchain = false;
+      _vk_context->recreate_swapchain = false;
     } catch (...) {
       handle_exception("swapchain recreation");
       cleanup();
@@ -803,9 +854,9 @@ class vulkan_layer final : public Ilayer {
     // Line width greater than 1.0 requires GPU extension
 
     vk::PipelineMultisampleStateCreateInfo multisampling{
-        .rasterizationSamples = _msaa_samples,
+        .rasterizationSamples = _vk_context->config.msaa_sample_count,
         .sampleShadingEnable  = vk::True,
-        .minSampleShading     = vulkan_config::msaa_shading_rate,
+        .minSampleShading     = _vk_context->config.msaa_shading_rate,
     };
 
     vk::PipelineColorBlendAttachmentState color_blend_attachment{
@@ -870,7 +921,7 @@ class vulkan_layer final : public Ilayer {
     vk::PipelineRenderingCreateInfo pipeline_rendering_info{
         .colorAttachmentCount    = 1,
         .pColorAttachmentFormats = &_swapchain_format.format,
-        .depthAttachmentFormat   = vulkan_config::graphics_pipeline.depth_format
+        .depthAttachmentFormat   = _vk_context->config.depth_format
     };
 
     vk::StructureChain<
@@ -894,7 +945,7 @@ class vulkan_layer final : public Ilayer {
       _device.waitIdle();
       _graphics_pipeline = nullptr;
       create_graphics_pipeline();
-      get_app_context()->vulkan.recreate_graphics_pipeline = false;
+      _vk_context->recreate_graphics_pipeline = false;
     } catch (...) {
       handle_exception("graphics pipeline recreation");
       cleanup();
@@ -916,14 +967,14 @@ class vulkan_layer final : public Ilayer {
     _depth_image = create_image(
         _allocator,
         _device,
-        vulkan_config::graphics_pipeline.depth_format,
+        _vk_context->config.depth_format,
         _swapchain_extent.width,
         _swapchain_extent.height,
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
         vk::ImageAspectFlagBits::eDepth,
         false,
         1,
-        _msaa_samples
+        _vk_context->config.msaa_sample_count
     );
     auto cmd = begin_transient_command_buffer(_command_pool, _device);
     transition_image_global_layout(
@@ -1015,7 +1066,7 @@ class vulkan_layer final : public Ilayer {
     vk::CommandBufferBeginInfo beginInfo{};
     command_buffer.begin(beginInfo);
 
-    if (_msaa_samples != vk::SampleCountFlagBits::e1) {
+    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
       transition_image_global_layout(
           _color_image,
           command_buffer,
@@ -1039,7 +1090,7 @@ class vulkan_layer final : public Ilayer {
     );
 
     vk::RenderingAttachmentInfo color_attachment_info;
-    if (_msaa_samples != vk::SampleCountFlagBits::e1) {
+    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
       color_attachment_info = {
           .imageView          = _color_image.view,
           .imageLayout        = vk::ImageLayout::eColorAttachmentOptimal,
@@ -1048,7 +1099,7 @@ class vulkan_layer final : public Ilayer {
           .resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
           .loadOp             = vk::AttachmentLoadOp::eClear,
           .storeOp            = vk::AttachmentStoreOp::eDontCare,
-          .clearValue         = vulkan_config::clear_color
+          .clearValue         = _vk_context->config.clear_color
       };
     } else {
       color_attachment_info = {
@@ -1056,7 +1107,7 @@ class vulkan_layer final : public Ilayer {
           .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
           .loadOp      = vk::AttachmentLoadOp::eClear,
           .storeOp     = vk::AttachmentStoreOp::eStore,
-          .clearValue  = vulkan_config::clear_color
+          .clearValue  = _vk_context->config.clear_color
       };
     }
     vk::RenderingAttachmentInfo depth_attachment_info{
@@ -1064,7 +1115,7 @@ class vulkan_layer final : public Ilayer {
         .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
         .loadOp      = vk::AttachmentLoadOp::eClear,
         .storeOp     = vk::AttachmentStoreOp::eDontCare,
-        .clearValue  = vulkan_config::clear_depth
+        .clearValue  = _vk_context->config.clear_depth
     };
 
     vk::RenderingInfo renderingInfo{
@@ -1111,8 +1162,7 @@ class vulkan_layer final : public Ilayer {
       mesh.render(command_buffer);
     }
 
-    ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *_command_buffers.at(_frame_index));
+    imgui_end_frame(_command_buffers.at(_frame_index));
 
     command_buffer.endRendering();
 
@@ -1198,7 +1248,7 @@ class vulkan_layer final : public Ilayer {
     result = _graphics_queue.presentKHR(presentInfo);
 
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR
-        || get_app_context()->vulkan.recreate_swapchain) {
+        || _vk_context->recreate_swapchain) {
       recreate_swapchain();
     } else if (result != vk::Result::eSuccess) {
       throw std::runtime_error("Graphics queue presentation failed: " + vk::to_string(result));
@@ -1210,6 +1260,9 @@ class vulkan_layer final : public Ilayer {
   static inline bool _instance_running           = false;
   static inline vega_console _console            = console::create("Vulkan");
   static inline vega_console _validation_console = console::create("VulkanValidation");
+
+  // dynamic_config _config{};
+  vulkan_context* _vk_context = nullptr;
 
   bool _initialised       = false;
   bool _imgui_initialised = false;
@@ -1231,7 +1284,6 @@ class vulkan_layer final : public Ilayer {
   std::vector<vk::raii::ImageView> _swapchain_views;
   std::vector<vk::raii::Semaphore> _swapchain_semaphores;
   gpu_image _color_image;
-  vk::SampleCountFlagBits _msaa_samples = vk::SampleCountFlagBits::e1;
 
   vk::raii::Pipeline _graphics_pipeline = nullptr;
   PushConstants _push_constants;

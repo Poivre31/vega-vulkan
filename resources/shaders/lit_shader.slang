@@ -57,7 +57,7 @@ float3 randFloat3(float a, float b, uint seed) {
 }
 
 float4 linear_to_srgb(float4 x) {
-  return select(x<=0.0031308, 12.92*x, 1.055*pow(x,1./2.4)-0.055);
+  return select(x <= 0.0031308, 12.92 * x, 1.055 * pow(x, 1. / 2.4) - 0.055);
 }
 
 [shader("vertex")]
@@ -103,5 +103,5 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
   }
   albedo.a = 1;
 
-  return linear_to_srgb(albedo*light);
+  return linear_to_srgb(albedo * light);
 }

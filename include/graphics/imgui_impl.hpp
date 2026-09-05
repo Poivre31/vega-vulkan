@@ -28,8 +28,8 @@ void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
   ImGui_ImplSDL3_InitForVulkan(window);
-  auto format = VkFormat(vulkan_config::swapchain.color_format);
-  auto depth  = VkFormat(vulkan_config::graphics_pipeline.depth_format);
+  auto format = VkFormat(vk_context.config.color_format);
+  auto depth  = VkFormat(vk_context.config.depth_format);
   ImGui_ImplVulkan_InitInfo init_info{
       .Instance       = **vk_context.instance,
       .PhysicalDevice = **vk_context.physical_device,
@@ -37,14 +37,14 @@ void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
       .QueueFamily    = vk_context.graphics_queue_family,
       .Queue          = **vk_context.graphics_queue,
       .DescriptorPool = **vk_context.imgui_descriptor_pool,
-      .MinImageCount  = 2,
-      .ImageCount     = vk_context.image_count,
+      .MinImageCount  = vk_context.config.swapchain_image_count,
+      .ImageCount     = vk_context.config.swapchain_image_count,
       .PipelineCache  = VK_NULL_HANDLE,
       .PipelineInfoMain =
           ImGui_ImplVulkan_PipelineInfo{
               .RenderPass  = NULL,
               .MSAASamples = static_cast<VkSampleCountFlagBits>(
-                  static_cast<VkFlags>(vk_context.msaa_sample_count)
+                  static_cast<VkFlags>(vk_context.config.msaa_sample_count)
               ),
               .PipelineRenderingCreateInfo =
                   {.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
@@ -82,4 +82,47 @@ void imgui_cleanup() {
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
   console::get(consoles::graphics)->info("Cleaned-up ImGui");
+}
+
+void imgui_update_vulkan(SDL_Window* window, vulkan_context& vk_context) {
+  vk_context.device->waitIdle();
+  ImGui_ImplVulkan_Shutdown();
+  ImGui_ImplSDL3_Shutdown();
+  ImGui::DestroyPlatformWindows();
+
+  ImGui_ImplSDL3_InitForVulkan(window);
+
+  auto format = VkFormat(vk_context.config.color_format);
+  auto depth  = VkFormat(vk_context.config.depth_format);
+  ImGui_ImplVulkan_InitInfo init_info{
+      .Instance       = **vk_context.instance,
+      .PhysicalDevice = **vk_context.physical_device,
+      .Device         = **vk_context.device,
+      .QueueFamily    = vk_context.graphics_queue_family,
+      .Queue          = **vk_context.graphics_queue,
+      .DescriptorPool = **vk_context.imgui_descriptor_pool,
+      .MinImageCount  = vk_context.config.swapchain_image_count,
+      .ImageCount     = vk_context.config.swapchain_image_count,
+      .PipelineCache  = VK_NULL_HANDLE,
+      .PipelineInfoMain =
+          ImGui_ImplVulkan_PipelineInfo{
+              .RenderPass  = NULL,
+              .MSAASamples = static_cast<VkSampleCountFlagBits>(
+                  static_cast<VkFlags>(vk_context.config.msaa_sample_count)
+              ),
+              .PipelineRenderingCreateInfo =
+                  {.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                   .colorAttachmentCount    = 1,
+                   .pColorAttachmentFormats = &format,
+                   .depthAttachmentFormat   = depth},
+          },
+      .UseDynamicRendering = vk::True,
+      .Allocator           = *vk_context.allocator->getAllocationCallbacks(),
+      .CheckVkResultFn     = check_vk_result,
+  };
+  if (!ImGui_ImplVulkan_Init(&init_info)) {
+    throw std::runtime_error("Imgui update has failed");
+  }
+
+  vk_context.update_imgui = false;
 }
