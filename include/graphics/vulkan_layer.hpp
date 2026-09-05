@@ -540,44 +540,17 @@ class vulkan_layer final : public Ilayer {
     // CHOOSE MSAA SAMPLES
     vk::SampleCountFlags counts = device_properties.limits.framebufferColorSampleCounts
                                   & device_properties.limits.framebufferDepthSampleCounts;
+    bool found_suitable_count   = false;
     for (int i = 6; i >= 0; i--) {
-      if (counts & vk::SampleCountFlagBits(1 << i)) {
-        _vk_context->config.available_msaa_sample_counts.emplace_back(
-            vk::SampleCountFlagBits(1 << i)
-        );
+      auto count = vk::SampleCountFlagBits(1 << i);
+      if (counts & count) {
+        _vk_context->config.available_msaa_sample_counts.emplace_back(count);
+        if (count <= _vk_context->config.msaa_sample_count && !found_suitable_count) {
+          _vk_context->config.msaa_sample_count = count;
+          found_suitable_count                  = true;
+        }
       }
     }
-    if (counts & vk::SampleCountFlagBits::e64
-        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e64) {
-      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e64;
-      return;
-    }
-    if (counts & vk::SampleCountFlagBits::e32
-        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e32) {
-      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e32;
-      return;
-    }
-    if (counts & vk::SampleCountFlagBits::e16
-        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e16) {
-      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e16;
-      return;
-    }
-    if (counts & vk::SampleCountFlagBits::e8
-        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e8) {
-      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e8;
-      return;
-    }
-    if (counts & vk::SampleCountFlagBits::e4
-        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e4) {
-      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e4;
-      return;
-    }
-    if (counts & vk::SampleCountFlagBits::e2
-        && _vk_context->config.msaa_sample_count >= vk::SampleCountFlagBits::e2) {
-      _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e2;
-      return;
-    }
-    _vk_context->config.msaa_sample_count = vk::SampleCountFlagBits::e1;
   }
 
   void create_logical_device() {
@@ -751,7 +724,14 @@ class vulkan_layer final : public Ilayer {
 
   void recreate_swapchain() {
     try {
-      _console->info("Recreating swapchain");
+      SDL_Event event{0};
+      while (SDL_GetWindowFlags(get_app_context()->window) & SDL_WINDOW_MINIMIZED) {
+        SDL_WaitEvent(&event);
+        if (event.type == SDL_EVENT_QUIT) {
+          get_app_context()->running = false;
+          return;
+        }
+      }
       _device.waitIdle();
       _swapchain = nullptr;
       _swapchain_semaphores.clear();
