@@ -930,6 +930,7 @@ class vulkan_layer final : public Ilayer {
   }
 
   void create_depth_resources() {
+    auto cmd = begin_transient_command_buffer(_command_pool, _device);
     if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
       _color_image = create_image(
           _allocator,
@@ -942,6 +943,9 @@ class vulkan_layer final : public Ilayer {
           false,
           1,
           _vk_context->config.msaa_sample_count
+      );
+      transition_image_global_layout(
+          _color_image, cmd, layout_transition::undef_to_color_attachment
       );
     }
 
@@ -957,9 +961,6 @@ class vulkan_layer final : public Ilayer {
         1,
         _vk_context->config.msaa_sample_count
     );
-    auto cmd = begin_transient_command_buffer(_command_pool, _device);
-
-    transition_image_global_layout(_color_image, cmd, layout_transition::undef_to_color_attachment);
     transition_image_global_layout(_depth_image, cmd, layout_transition::undef_to_depth_attachment);
 
     submit_transient_command_buffer(_graphics_queue, std::move(cmd));
