@@ -1,19 +1,103 @@
 #pragma once
 
+#include <stdexcept>
 #include "graphics.hpp"
 #include "gpu_objects.hpp"
+#include "vulkan/vulkan.hpp"
 
-enum class layout_transition : uint8_t { dst_to_src, src_to_shader_read, dst_to_shader_read };
+enum class layout_transition : uint8_t {
+  dst_to_src,
+  src_to_shader_read,
+  dst_to_shader_read,
+  undef_to_src,
+  undef_to_dst,
+  undef_to_color_attachment,
+  undef_to_depth_attachment,
+  undef_to_shader_storage_write,
+};
 
-const std::unordered_map<layout_transition, std::pair<vk::ImageLayout, vk::ImageLayout>>
-    associated_transition_layouts{
-        {layout_transition::dst_to_src,
-         {vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal}},
-        {layout_transition::src_to_shader_read,
-         {vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal}},
-        {layout_transition::dst_to_shader_read,
-         {vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal}},
-    };
+struct layout_transition_data {
+  vk::ImageLayout src_layout;
+  vk::ImageLayout dst_layout;
+  vk::AccessFlags2 src_access;
+  vk::AccessFlags2 dst_access;
+  vk::PipelineStageFlags2 src_stage;
+  vk::PipelineStageFlags2 dst_stage;
+};
+
+const std::unordered_map<layout_transition, layout_transition_data> associated_transition_layouts{
+    {layout_transition::dst_to_src,
+     {
+         .src_layout = vk::ImageLayout::eTransferDstOptimal,
+         .dst_layout = vk::ImageLayout::eTransferSrcOptimal,
+         .src_access = vk::AccessFlagBits2::eTransferWrite,
+         .dst_access = vk::AccessFlagBits2::eTransferRead,
+         .src_stage  = vk::PipelineStageFlagBits2::eTransfer,
+         .dst_stage  = vk::PipelineStageFlagBits2::eTransfer,
+     }},
+    {layout_transition::src_to_shader_read,
+     {
+         .src_layout = vk::ImageLayout::eTransferSrcOptimal,
+         .dst_layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+         .src_access = vk::AccessFlagBits2::eTransferRead,
+         .dst_access = vk::AccessFlagBits2::eShaderRead,
+         .src_stage  = vk::PipelineStageFlagBits2::eTransfer,
+         .dst_stage  = vk::PipelineStageFlagBits2::eFragmentShader,
+     }},
+    {layout_transition::dst_to_shader_read,
+     {
+         .src_layout = vk::ImageLayout::eTransferDstOptimal,
+         .dst_layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+         .src_access = vk::AccessFlagBits2::eTransferWrite,
+         .dst_access = vk::AccessFlagBits2::eShaderRead,
+         .src_stage  = vk::PipelineStageFlagBits2::eTransfer,
+         .dst_stage  = vk::PipelineStageFlagBits2::eFragmentShader,
+     }},
+    {layout_transition::undef_to_src,
+     {
+         .src_layout = vk::ImageLayout::eUndefined,
+         .dst_layout = vk::ImageLayout::eTransferSrcOptimal,
+         .src_access = {},
+         .dst_access = vk::AccessFlagBits2::eTransferRead,
+         .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,
+         .dst_stage  = vk::PipelineStageFlagBits2::eTransfer,
+     }},
+    {layout_transition::undef_to_dst,
+     {
+         .src_layout = vk::ImageLayout::eUndefined,
+         .dst_layout = vk::ImageLayout::eTransferDstOptimal,
+         .src_access = {},
+         .dst_access = vk::AccessFlagBits2::eTransferWrite,
+         .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,
+         .dst_stage  = vk::PipelineStageFlagBits2::eTransfer,
+     }},
+    {layout_transition::undef_to_color_attachment,
+     {
+         .src_layout = vk::ImageLayout::eUndefined,
+         .dst_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .src_access = {},
+         .dst_access = vk::AccessFlagBits2::eColorAttachmentWrite,
+         .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,
+         .dst_stage  = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+     }},
+    {layout_transition::undef_to_depth_attachment,
+     {.src_layout = vk::ImageLayout::eUndefined,
+      .dst_layout = vk::ImageLayout::eDepthAttachmentOptimal,
+      .src_access = {},
+      .dst_access = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+      .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,
+      .dst_stage  = vk::PipelineStageFlagBits2::eEarlyFragmentTests
+                    | vk::PipelineStageFlagBits2::eLateFragmentTests}},
+    {layout_transition::undef_to_shader_storage_write,
+     {
+         .src_layout = vk::ImageLayout::eUndefined,
+         .dst_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .src_access = {},
+         .dst_access = vk::AccessFlagBits2::eShaderStorageWrite,
+         .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,
+         .dst_stage  = vk::PipelineStageFlagBits2::eComputeShader,
+     }},
+};
 
 void transition_image_layout(
     const vk::Image& image,
@@ -60,40 +144,18 @@ void transition_image_layout(
     uint32_t mip_level       = 0,
     uint32_t mip_level_count = 1
 ) {
-  auto [old_layout, new_layout] = associated_transition_layouts.at(transition);
-  vk::AccessFlags2 src_access_mask, dst_access_mask;
-  vk::PipelineStageFlags2 src_stage_mask, dst_stage_mask;
-
-  switch (transition) {
-    case (layout_transition::dst_to_src):
-      src_access_mask = vk::AccessFlagBits2::eTransferWrite;
-      dst_access_mask = vk::AccessFlagBits2::eTransferRead;
-      src_stage_mask  = vk::PipelineStageFlagBits2::eTransfer;
-      dst_stage_mask  = vk::PipelineStageFlagBits2::eTransfer;
-      break;
-    case (layout_transition::src_to_shader_read):
-      src_access_mask = vk::AccessFlagBits2::eTransferRead;
-      dst_access_mask = vk::AccessFlagBits2::eShaderRead;
-      src_stage_mask  = vk::PipelineStageFlagBits2::eTransfer;
-      dst_stage_mask  = vk::PipelineStageFlagBits2::eFragmentShader;
-      break;
-    case (layout_transition::dst_to_shader_read):
-      src_access_mask = vk::AccessFlagBits2::eTransferWrite;
-      dst_access_mask = vk::AccessFlagBits2::eShaderRead;
-      src_stage_mask  = vk::PipelineStageFlagBits2::eTransfer;
-      dst_stage_mask  = vk::PipelineStageFlagBits2::eFragmentShader;
-      break;
-    default:
-      throw std::runtime_error("Layout transition not implemented");
+  if (!associated_transition_layouts.contains(transition)) {
+    throw std::runtime_error("Layout transition is not implemented");
   }
+  auto transition_data = associated_transition_layouts.at(transition);
 
   vk::ImageMemoryBarrier2 barrier = {
-      .srcStageMask        = src_stage_mask,
-      .srcAccessMask       = src_access_mask,
-      .dstStageMask        = dst_stage_mask,
-      .dstAccessMask       = dst_access_mask,
-      .oldLayout           = old_layout,
-      .newLayout           = new_layout,
+      .srcStageMask        = transition_data.src_stage,
+      .srcAccessMask       = transition_data.src_access,
+      .dstStageMask        = transition_data.dst_stage,
+      .dstAccessMask       = transition_data.dst_access,
+      .oldLayout           = transition_data.src_layout,
+      .newLayout           = transition_data.dst_layout,
       .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
       .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
       .image               = image,
@@ -152,14 +214,12 @@ void transition_image_global_layout(
         "mip levels don't have the same layout"
     );
   }
-  auto [old_layout, new_layout] = associated_transition_layouts.at(transition);
-  if (old_layout != image.layout.value()) {
-    throw std::runtime_error("Given layout transition doesn't match src texture's layout");
-  }
+  auto transition_data = associated_transition_layouts.at(transition);
+
   transition_image_layout(
       image.image, command_buffer, transition, image.aspect, 0, image.mip_level_count
   );
-  image.layout = new_layout;
+  image.layout = transition_data.dst_layout;
 }
 
 void transition_image_mip_layout(

@@ -241,7 +241,7 @@ load_texture_to_gpu(vulkan_context& vk_context, stb_image&& cpu_texture, simple_
   //       vk::PipelineStageFlagBits2::eTopOfPipe,
   //       vk::PipelineStageFlagBits2::eTransfer
   //   );
-  submit_single_command_buffer(vk_context, std::move(cmd));
+  submit_transient_command_buffer(vk_context, std::move(cmd));
   image.sampler = &sampler.get();
   return std::move(image);
 }

@@ -88,7 +88,7 @@ class host_buffer {
           .srcBuffer = _staging_buffer, .dstBuffer = _buffer, .regionCount = 1, .pRegions = &region
       };
       cmd.copyBuffer2(copy_info);
-      submit_single_command_buffer(vk_context, std::move(cmd));
+      submit_transient_command_buffer(vk_context, std::move(cmd));
       if (!_permanent) {
         _staging_buffer = nullptr;
       }

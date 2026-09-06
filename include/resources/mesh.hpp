@@ -87,7 +87,7 @@ class mesh_3D {
     cmd.copyBuffer(
         staging_buffer, _buffer, vk::BufferCopy{.srcOffset = 0, .dstOffset = 0, .size = size}
     );
-    submit_single_command_buffer(context, std::move(cmd));
+    submit_transient_command_buffer(context, std::move(cmd));
   }
 
   //   void set_texture_handles(const std::vector<handle<gpu_image>>& handles) {

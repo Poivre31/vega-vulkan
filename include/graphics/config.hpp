@@ -48,4 +48,6 @@ constexpr uint32_t max_number_of_textures = 512;
 
 constexpr uint32_t frames_in_flight = 2;
 
+constexpr bool enable_post_processing = true;
+
 }  // namespace vulkan_config

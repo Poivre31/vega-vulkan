@@ -17,6 +17,7 @@
 #include "context.hpp"
 #include "config.hpp"
 #include "graphics/image_layout.hpp"
+#include "graphics/single_command_buffer.hpp"
 #include "imgui_impl.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_to_string.hpp"
@@ -53,6 +54,7 @@ class vulkan_layer final : public Ilayer {
       create_graphics_pipeline();
       create_command_pool();
       create_depth_resources();
+      create_post_processing_resources();
       create_descriptor_pools();
       create_descriptor_sets();
       create_command_buffer();
@@ -657,6 +659,10 @@ class vulkan_layer final : public Ilayer {
       );
     }
 
+    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment;
+    if (vulkan_config::enable_post_processing) {
+      usage |= vk::ImageUsageFlagBits::eTransferDst;
+    }
     vk::SwapchainCreateInfoKHR swapchain_info{
         .surface          = *_surface,
         .minImageCount    = requested_image_count,
@@ -664,14 +670,10 @@ class vulkan_layer final : public Ilayer {
         .imageColorSpace  = _swapchain_format.colorSpace,
         .imageExtent      = _swapchain_extent,
         .imageArrayLayers = 1,  // Always 1 except for stereo 3D
-        .imageUsage = vk::ImageUsageFlags::BitsType::eColorAttachment,  // To write directly to
-                                                                        // the screen,
-                                                                        // eTransferDst to
-                                                                        // postProcess then send
-                                                                        // to the screen
-        .imageSharingMode = vk::SharingMode::eExclusive,    // One family queue write to the image
-                                                            // at the time
-        .preTransform     = capabilities.currentTransform,  // Like image rotation or flip
+        .imageUsage       = usage,
+        .imageSharingMode = vk::SharingMode::eExclusive,  // One family queue write to the image
+                                                          // at the time
+        .preTransform     = capabilities.currentTransform,
         .compositeAlpha   = vk::CompositeAlphaFlagsKHR::BitsType::eOpaque,
         .presentMode      = present_mode,
         .clipped          = vk::True,
@@ -703,22 +705,6 @@ class vulkan_layer final : public Ilayer {
 
       vk::SemaphoreCreateInfo semaphore_info{};
       _swapchain_semaphores.emplace_back(_device, semaphore_info);
-    }
-
-    // MULTISAMPLING IMAGE
-    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
-      _color_image = create_image(
-          _allocator,
-          _device,
-          _vk_context->config.color_format,
-          _swapchain_extent.width,
-          _swapchain_extent.height,
-          vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
-          vk::ImageAspectFlagBits::eColor,
-          false,
-          1,
-          _vk_context->config.msaa_sample_count
-      );
     }
   }
 
@@ -944,6 +930,21 @@ class vulkan_layer final : public Ilayer {
   }
 
   void create_depth_resources() {
+    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
+      _color_image = create_image(
+          _allocator,
+          _device,
+          _vk_context->config.color_format,
+          _swapchain_extent.width,
+          _swapchain_extent.height,
+          vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
+          vk::ImageAspectFlagBits::eColor,
+          false,
+          1,
+          _vk_context->config.msaa_sample_count
+      );
+    }
+
     _depth_image = create_image(
         _allocator,
         _device,
@@ -957,19 +958,44 @@ class vulkan_layer final : public Ilayer {
         _vk_context->config.msaa_sample_count
     );
     auto cmd = begin_transient_command_buffer(_command_pool, _device);
-    transition_image_global_layout(
-        _depth_image,
-        cmd,
-        vk::ImageLayout::eDepthAttachmentOptimal,
-        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-        vk::PipelineStageFlagBits2::eEarlyFragmentTests
-            | vk::PipelineStageFlagBits2::eLateFragmentTests,
-        vk::PipelineStageFlagBits2::eEarlyFragmentTests
-            | vk::PipelineStageFlagBits2::eLateFragmentTests
+
+    transition_image_global_layout(_color_image, cmd, layout_transition::undef_to_color_attachment);
+    transition_image_global_layout(_depth_image, cmd, layout_transition::undef_to_depth_attachment);
+
+    submit_transient_command_buffer(_graphics_queue, std::move(cmd));
+  }
+
+  void create_post_processing_resources() {
+    _pp_front_image = create_image(
+        _allocator,
+        _device,
+        _vk_context->config.color_format,
+        _swapchain_extent.width,
+        _swapchain_extent.height,
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
+            | vk::ImageUsageFlagBits::eStorage,
+        vk::ImageAspectFlagBits::eColor,
+        false
+    );
+    _pp_back_image = create_image(
+        _allocator,
+        _device,
+        _vk_context->config.color_format,
+        _swapchain_extent.width,
+        _swapchain_extent.height,
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage,
+        vk::ImageAspectFlagBits::eColor,
+        false
     );
 
-    submit_single_command_buffer(_graphics_queue, std::move(cmd));
+    auto cmd = begin_transient_command_buffer(_command_pool, _device);
+    transition_image_global_layout(
+        _pp_front_image, cmd, layout_transition::undef_to_color_attachment
+    );
+    transition_image_global_layout(
+        _pp_front_image, cmd, layout_transition::undef_to_shader_storage_write
+    );
+    submit_transient_command_buffer(_graphics_queue, std::move(cmd));
   }
 
   void create_descriptor_pools() {
@@ -1046,17 +1072,6 @@ class vulkan_layer final : public Ilayer {
     vk::CommandBufferBeginInfo beginInfo{};
     command_buffer.begin(beginInfo);
 
-    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
-      transition_image_global_layout(
-          _color_image,
-          command_buffer,
-          vk::ImageLayout::eColorAttachmentOptimal,
-          vk::AccessFlagBits2::eColorAttachmentWrite,
-          vk::AccessFlagBits2::eColorAttachmentWrite,
-          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-          vk::PipelineStageFlagBits2::eColorAttachmentOutput
-      );
-    }
     transition_image_layout(
         _swapchain_images.at(image_index),
         command_buffer,
@@ -1263,15 +1278,16 @@ class vulkan_layer final : public Ilayer {
   std::vector<vk::Image> _swapchain_images;
   std::vector<vk::raii::ImageView> _swapchain_views;
   std::vector<vk::raii::Semaphore> _swapchain_semaphores;
-  gpu_image _color_image;
+  gpu_image _color_image;  // FOR MSAA
+  gpu_image _depth_image;
+  gpu_image _pp_front_image;  // FOR POST PROCESSING
+  gpu_image _pp_back_image;
 
   vk::raii::Pipeline _graphics_pipeline = nullptr;
   PushConstants _push_constants;
   vk::raii::PipelineLayout _pipeline_layout = nullptr;
 
   vk::raii::CommandPool _command_pool = nullptr;
-
-  gpu_image _depth_image;
 
   vk::raii::DescriptorSetLayout _descriptor_set_layout = nullptr;
   vk::raii::DescriptorPool _descriptor_pool            = nullptr;
