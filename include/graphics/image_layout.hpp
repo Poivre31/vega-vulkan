@@ -91,7 +91,7 @@ const std::unordered_map<layout_transition, layout_transition_data> associated_t
     {layout_transition::undef_to_shader_storage_write,
      {
          .src_layout = vk::ImageLayout::eUndefined,
-         .dst_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .dst_layout = vk::ImageLayout::eGeneral,
          .src_access = {},
          .dst_access = vk::AccessFlagBits2::eShaderStorageWrite,
          .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,

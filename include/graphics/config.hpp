@@ -11,7 +11,7 @@ struct dynamic_config {
   uint32_t min_swapchain_image_count{};
   uint32_t max_swapchain_image_count{};
   uint32_t swapchain_image_count = 3;
-  bool vsync                     = true;
+  bool vsync                     = false;
 
   vk::ClearValue clear_color = vk::ClearColorValue(0.F, 0.F, 0.F, 0.F);
   vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.F, 0);

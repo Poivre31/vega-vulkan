@@ -28,7 +28,7 @@ const model_info tank{
     .mesh_name          = "t34.obj",
     .scale              = 2.F,
     .z_is_up            = false,
-    .reverse_front_face = true,
+    .reverse_front_face = false,
 };
 
 const model_info sponza{

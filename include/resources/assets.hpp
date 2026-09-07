@@ -32,11 +32,11 @@ class assets_layer final : public Ilayer {
       auto viking_mat = resources.materials.push(viking_tex);
 
       // MODELS
-      // scene.load_mesh_from_obj_mtl(vk_context, meshes::viking, viking_mat);
+      // scene.load_mesh_from_obj(vk_context, meshes::viking, viking_mat);
       // scene.load_mesh_from_obj_mtl(vk_context, meshes::tyra);
       scene.load_mesh_from_obj_mtl(vk_context, meshes::sponza);
       // scene.load_mesh_from_obj_mtl(vk_context, meshes::tank);
-      scene.load_vertex_array(create_cube({1.F, 0.F, 1.F}, 0.5F), beer_mat);
+      scene.load_vertex_array(create_cube({1.F, 0.F, 0.F}, 0.5F), beer_mat);
 
       for (auto& mesh : resources.meshes) {
         mesh.create_vertex_buffer(vk_context);

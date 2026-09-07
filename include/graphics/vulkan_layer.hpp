@@ -20,9 +20,10 @@
 #include "graphics/single_command_buffer.hpp"
 #include "imgui_impl.hpp"
 #include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan_raii.hpp"
 #include "vulkan/vulkan_to_string.hpp"
 
-struct PushConstants {
+struct PC_graphics_properties {
   glm::mat4x4 view_projection_matrix{};
   vk::DeviceAddress material_buffer{};
   uint32_t material_count{};
@@ -52,6 +53,7 @@ class vulkan_layer final : public Ilayer {
       create_swapchain();
       create_descriptor_set_layouts();
       create_graphics_pipeline();
+      create_compute_pipeline();
       create_command_pool();
       create_depth_resources();
       create_post_processing_resources();
@@ -239,7 +241,7 @@ class vulkan_layer final : public Ilayer {
           available_queue_families.begin(),
           available_queue_families.end(),
           [](auto const& queue_properties) {
-            return queue_properties.queueFlags & vk::QueueFlagBits::eGraphics;
+            return queue_properties.queueFlags & (vk::QueueFlagBits::eGraphics|vk::QueueFlagBits::eCompute) ;
           }
       )) {
       return false;
@@ -434,6 +436,8 @@ class vulkan_layer final : public Ilayer {
     _instance = vk::raii::Instance(_context, instance_info);
     if (!*_instance) {
       throw std::runtime_error("Instance creation silently failed");
+    } else {
+      _console->trace("Created vulkan instance");
     }
   }
 
@@ -474,6 +478,8 @@ class vulkan_layer final : public Ilayer {
 
     if (!*_surface) {
       throw std::runtime_error("Surface creation silently failed");
+    } else {
+      _console->trace("Created vulkan surface");
     }
   }
 
@@ -553,6 +559,8 @@ class vulkan_layer final : public Ilayer {
         }
       }
     }
+
+    _console->trace("Picked vulkan physical device");
   }
 
   void create_logical_device() {
@@ -585,7 +593,8 @@ class vulkan_layer final : public Ilayer {
     auto queue_family_properties = _physical_device.getQueueFamilyProperties2();
     uint32_t family_index        = 0;
     for (const auto& queue_family : queue_family_properties) {
-      if ((queue_family.queueFamilyProperties.queueFlags & vk::QueueFlagBits::eGraphics)
+      if ((queue_family.queueFamilyProperties.queueFlags
+           & (vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute))
           && _physical_device.getSurfaceSupportKHR(family_index, *_surface)) {
         _graphics_queue_family = family_index;
         break;
@@ -617,10 +626,14 @@ class vulkan_layer final : public Ilayer {
     _device = vk::raii::Device(_physical_device, device_info);
     if (!*_device) {
       throw std::runtime_error("Logical device creation silently failed");
+    } else {
+      _console->trace("Created vulkan device");
     }
     _graphics_queue = vk::raii::Queue(_device, _graphics_queue_family, 0);
     if (!*_graphics_queue) {
       throw std::runtime_error("Graphics queue creation silently failed");
+    } else {
+      _console->trace("Created vulkan graphics queue");
     }
   }
 
@@ -632,6 +645,8 @@ class vulkan_layer final : public Ilayer {
     _allocator = vma::raii::createAllocator(_instance, _device, allocator_info);
     if (!*_allocator) {
       throw std::runtime_error("VMA allocator creation silently failed");
+    } else {
+      _console->trace("Created vulkan VMA allocator");
     }
   }
 
@@ -684,6 +699,8 @@ class vulkan_layer final : public Ilayer {
     _swapchain = vk::raii::SwapchainKHR(_device, swapchain_info);
     if (!*_swapchain) {
       throw std::runtime_error("Swapchain creation silently failed");
+    } else {
+      _console->trace("Created vulkan swapchain");
     }
     _swapchain_images = _swapchain.getImages();
 
@@ -723,12 +740,47 @@ class vulkan_layer final : public Ilayer {
       _swapchain_semaphores.clear();
       _swapchain_views.clear();
       _swapchain_images.clear();
-      _color_image.image = nullptr;
-      _color_image.view  = nullptr;
-      _depth_image.image = nullptr;
-      _depth_image.view  = nullptr;
+      _color_image.image    = nullptr;
+      _color_image.view     = nullptr;
+      _depth_image.image    = nullptr;
+      _depth_image.view     = nullptr;
+      _pp_front_image.image = nullptr;
+      _pp_front_image.view  = nullptr;
+      _pp_back_image.image  = nullptr;
+      _pp_back_image.view   = nullptr;
       create_swapchain();
       create_depth_resources();
+      create_post_processing_resources();
+      std::vector<vk::WriteDescriptorSet> write_descriptor_sets;
+      vk::DescriptorImageInfo front_image_descriptor{
+          .sampler     = nullptr,
+          .imageView   = _pp_front_image.view,
+          .imageLayout = vk::ImageLayout::eGeneral
+      };
+      write_descriptor_sets.push_back(
+          {.dstSet          = _compute_descriptor_set,
+           .dstBinding      = 0,
+           .dstArrayElement = 0,
+           .descriptorCount = 1,
+           .descriptorType  = vk::DescriptorType::eStorageImage,
+           .pImageInfo      = &front_image_descriptor}
+      );
+
+      vk::DescriptorImageInfo back_image_descriptor = {
+          .sampler     = nullptr,
+          .imageView   = _pp_back_image.view,
+          .imageLayout = vk::ImageLayout::eGeneral
+      };
+      write_descriptor_sets.push_back(
+          {.dstSet          = _compute_descriptor_set,
+           .dstBinding      = 1,
+           .dstArrayElement = 0,
+           .descriptorCount = 1,
+           .descriptorType  = vk::DescriptorType::eStorageImage,
+           .pImageInfo      = &back_image_descriptor}
+      );
+
+      _device.updateDescriptorSets(write_descriptor_sets, {});
       _vk_context->recreate_swapchain = false;
     } catch (...) {
       handle_exception("swapchain recreation");
@@ -854,7 +906,7 @@ class vulkan_layer final : public Ilayer {
     vk::PushConstantRange push_constants_range{
         .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
         .offset     = 0,
-        .size       = sizeof(PushConstants)
+        .size       = sizeof(PC_graphics_properties)
     };
 
     vk::PipelineLayoutCreateInfo pipeline_layout_info{
@@ -903,6 +955,8 @@ class vulkan_layer final : public Ilayer {
     );
     if (!*_graphics_pipeline) {
       throw std::runtime_error("Graphics pipeline creation silently failed");
+    } else {
+      _console->trace("Created vulkan graphics pipeline");
     }
   }
 
@@ -915,6 +969,66 @@ class vulkan_layer final : public Ilayer {
     } catch (...) {
       handle_exception("graphics pipeline recreation");
       cleanup();
+    }
+  }
+
+  void create_compute_pipeline() {
+    std::vector<vk::DescriptorSetLayoutBinding> layout_bindings{
+        vk::DescriptorSetLayoutBinding{
+            .binding         = 0,
+            .descriptorType  = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 1,
+            .stageFlags      = vk::ShaderStageFlagBits::eCompute
+        },
+        vk::DescriptorSetLayoutBinding{
+            .binding         = 1,
+            .descriptorType  = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 1,
+            .stageFlags      = vk::ShaderStageFlagBits::eCompute
+        },
+    };
+
+    vk::DescriptorSetLayoutCreateInfo layout_info{
+        .bindingCount = static_cast<uint32_t>(layout_bindings.size()),
+        .pBindings    = layout_bindings.data()
+    };
+
+    _compute_descriptor_set_layout = vk::raii::DescriptorSetLayout(_device, layout_info);
+    if (!*_compute_descriptor_set_layout) {
+      throw std::runtime_error("Descriptor set layout creation silently failed");
+    }
+
+    vk::ShaderModuleCreateInfo shader_module_info{
+        .codeSize = get_app_context()->shader_modules[1].size(),
+        .pCode    = reinterpret_cast<uint32_t*>(get_app_context()->shader_modules[1].data())
+    };
+    _compute_shader_module = vk::raii::ShaderModule(_device, shader_module_info);
+    if (!*_compute_shader_module) {
+      throw std::runtime_error("Shader module creation silently failed");
+    }
+    vk::PipelineShaderStageCreateInfo shader_stage_info{
+        .stage  = vk::ShaderStageFlagBits::eCompute,
+        .module = _compute_shader_module,
+        .pName  = "main"
+    };
+
+    vk::PipelineLayoutCreateInfo pipeline_layout_info{
+        .setLayoutCount = 1,
+        .pSetLayouts    = &*_compute_descriptor_set_layout,
+    };
+    _compute_pipeline_layout = vk::raii::PipelineLayout(_device, pipeline_layout_info);
+    if (!*_compute_pipeline_layout) {
+      throw std::runtime_error("Compute pipeline layout creation silently failed");
+    }
+
+    vk::ComputePipelineCreateInfo pipeline_info{
+        .stage = shader_stage_info, .layout = _compute_pipeline_layout
+    };
+    _compute_pipeline = _device.createComputePipeline(nullptr, pipeline_info);
+    if (!*_compute_pipeline) {
+      throw std::runtime_error("Compute pipeline creation failed silently");
+    } else {
+      _console->trace("Created vulkan compute pipeline");
     }
   }
 
@@ -984,7 +1098,8 @@ class vulkan_layer final : public Ilayer {
         _vk_context->config.color_format,
         _swapchain_extent.width,
         _swapchain_extent.height,
-        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage,
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage
+            | vk::ImageUsageFlagBits::eTransferSrc,
         vk::ImageAspectFlagBits::eColor,
         false
     );
@@ -993,9 +1108,7 @@ class vulkan_layer final : public Ilayer {
     transition_image_global_layout(
         _pp_front_image, cmd, layout_transition::undef_to_color_attachment
     );
-    transition_image_global_layout(
-        _pp_front_image, cmd, layout_transition::undef_to_shader_storage_write
-    );
+    transition_image_global_layout(_pp_back_image, cmd, layout_transition::undef_to_src);
     submit_transient_command_buffer(_graphics_queue, std::move(cmd));
   }
 
@@ -1043,6 +1156,21 @@ class vulkan_layer final : public Ilayer {
     if (!*_imgui_descriptor_pool) {
       throw std::runtime_error("ImGui's descriptor pool creation silently failed");
     }
+
+    pool_sizes = {
+        vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageImage, .descriptorCount = 2},
+    };
+    pool_info = {
+        .flags         = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+        .maxSets       = 1,
+        .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+        .pPoolSizes    = pool_sizes.data()
+    };
+
+    _compute_descriptor_pool = vk::raii::DescriptorPool(_device, pool_info);
+    if (!*_compute_descriptor_pool) {
+      throw std::runtime_error("Descriptor pool creation silently failed");
+    }
   }
 
   void create_descriptor_sets() {
@@ -1056,6 +1184,48 @@ class vulkan_layer final : public Ilayer {
     };
 
     _descriptor_sets = _device.allocateDescriptorSets(descriptor_set_info);
+
+    layouts             = {*_compute_descriptor_set_layout};
+    descriptor_set_info = {
+        .descriptorPool     = _compute_descriptor_pool,
+        .descriptorSetCount = 1,
+        .pSetLayouts        = layouts.data()
+    };
+
+    _compute_descriptor_set = std::move(
+        _device.allocateDescriptorSets(descriptor_set_info).front()
+    );
+
+    std::vector<vk::WriteDescriptorSet> write_descriptor_sets;
+    vk::DescriptorImageInfo front_image_descriptor{
+        .sampler     = nullptr,
+        .imageView   = _pp_front_image.view,
+        .imageLayout = vk::ImageLayout::eGeneral
+    };
+    write_descriptor_sets.push_back(
+        {.dstSet          = _compute_descriptor_set,
+         .dstBinding      = 0,
+         .dstArrayElement = 0,
+         .descriptorCount = 1,
+         .descriptorType  = vk::DescriptorType::eStorageImage,
+         .pImageInfo      = &front_image_descriptor}
+    );
+
+    vk::DescriptorImageInfo back_image_descriptor = {
+        .sampler     = nullptr,
+        .imageView   = _pp_back_image.view,
+        .imageLayout = vk::ImageLayout::eGeneral
+    };
+    write_descriptor_sets.push_back(
+        {.dstSet          = _compute_descriptor_set,
+         .dstBinding      = 1,
+         .dstArrayElement = 0,
+         .descriptorCount = 1,
+         .descriptorType  = vk::DescriptorType::eStorageImage,
+         .pImageInfo      = &back_image_descriptor}
+    );
+
+    _device.updateDescriptorSets(write_descriptor_sets, {});
   }
 
   void create_command_buffer() {
@@ -1086,12 +1256,16 @@ class vulkan_layer final : public Ilayer {
     );
 
     vk::RenderingAttachmentInfo color_attachment_info;
+    const auto& render_target = vulkan_config::enable_post_processing
+                                    ? _pp_front_image.view
+                                    : _swapchain_views.at(image_index);
+
     if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
       color_attachment_info = {
           .imageView          = _color_image.view,
           .imageLayout        = vk::ImageLayout::eColorAttachmentOptimal,
           .resolveMode        = vk::ResolveModeFlagBits::eAverage,
-          .resolveImageView   = *_swapchain_views.at(image_index),
+          .resolveImageView   = *render_target,
           .resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
           .loadOp             = vk::AttachmentLoadOp::eClear,
           .storeOp            = vk::AttachmentStoreOp::eDontCare,
@@ -1099,7 +1273,7 @@ class vulkan_layer final : public Ilayer {
       };
     } else {
       color_attachment_info = {
-          .imageView   = *_swapchain_views.at(image_index),
+          .imageView   = *render_target,
           .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
           .loadOp      = vk::AttachmentLoadOp::eClear,
           .storeOp     = vk::AttachmentStoreOp::eStore,
@@ -1147,7 +1321,7 @@ class vulkan_layer final : public Ilayer {
         nullptr
     );
 
-    command_buffer.pushConstants<PushConstants>(
+    command_buffer.pushConstants<PC_graphics_properties>(
         _pipeline_layout,
         vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
         0,
@@ -1162,17 +1336,127 @@ class vulkan_layer final : public Ilayer {
 
     command_buffer.endRendering();
 
-    transition_image_layout(
-        _swapchain_images.at(image_index),
-        command_buffer,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::ePresentSrcKHR,
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-        {},
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eBottomOfPipe,
-        vk::ImageAspectFlagBits::eColor
-    );
+    if (vulkan_config::enable_post_processing) {
+      transition_image_layout(
+          _pp_front_image.image,
+          command_buffer,
+          vk::ImageLayout::eColorAttachmentOptimal,
+          vk::ImageLayout::eGeneral,
+          vk::AccessFlagBits2::eColorAttachmentWrite,
+          vk::AccessFlagBits2::eShaderStorageRead,
+          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+          vk::PipelineStageFlagBits2::eComputeShader,
+          vk::ImageAspectFlagBits::eColor
+      );
+      transition_image_layout(
+          _pp_back_image.image,
+          command_buffer,
+          vk::ImageLayout::eTransferSrcOptimal,
+          vk::ImageLayout::eGeneral,
+          vk::AccessFlagBits2::eTransferRead,
+          vk::AccessFlagBits2::eShaderStorageWrite,
+          vk::PipelineStageFlagBits2::eTransfer,
+          vk::PipelineStageFlagBits2::eComputeShader,
+          vk::ImageAspectFlagBits::eColor
+      );
+
+      command_buffer.bindPipeline(vk::PipelineBindPoint::eCompute, _compute_pipeline);
+      command_buffer.bindDescriptorSets(
+          vk::PipelineBindPoint::eCompute,
+          _compute_pipeline_layout,
+          0,
+          {*_compute_descriptor_set},
+          {}
+      );
+
+      command_buffer.dispatch(
+          (_swapchain_extent.width + 7) / 8, (_swapchain_extent.height + 7) / 8, 1
+      );
+
+      transition_image_layout(
+          _pp_back_image.image,
+          command_buffer,
+          vk::ImageLayout::eGeneral,
+          vk::ImageLayout::eTransferSrcOptimal,
+          vk::AccessFlagBits2::eShaderStorageWrite,
+          vk::AccessFlagBits2::eTransferRead,
+          vk::PipelineStageFlagBits2::eComputeShader,
+          vk::PipelineStageFlagBits2::eBlit,
+          vk::ImageAspectFlagBits::eColor
+      );
+      transition_image_layout(
+          _swapchain_images.at(image_index),
+          command_buffer,
+          vk::ImageLayout::eColorAttachmentOptimal,
+          vk::ImageLayout::eTransferDstOptimal,
+          vk::AccessFlagBits2::eColorAttachmentWrite,
+          vk::AccessFlagBits2::eTransferWrite,
+          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+          vk::PipelineStageFlagBits2::eTransfer,
+          vk::ImageAspectFlagBits::eColor
+      );
+
+      vk::ImageBlit blit = {
+          .srcSubresource =
+              {.aspectMask = vk::ImageAspectFlagBits::eColor, .mipLevel = 0, .layerCount = 1},
+          .srcOffsets = std::array<vk::Offset3D, 2>(
+              {{},
+               {.x = static_cast<int32_t>(_swapchain_extent.width),
+                .y = static_cast<int32_t>(_swapchain_extent.height),
+                .z = 1}}
+          ),
+          .dstSubresource =
+              {.aspectMask = vk::ImageAspectFlagBits::eColor, .mipLevel = 0, .layerCount = 1},
+          .dstOffsets = std::array<vk::Offset3D, 2>(
+              {{},
+               {.x = static_cast<int32_t>(_swapchain_extent.width),
+                .y = static_cast<int32_t>(_swapchain_extent.height),
+                .z = 1}}
+          ),
+      };
+      command_buffer.blitImage(
+          _pp_back_image.image,
+          vk::ImageLayout::eTransferSrcOptimal,
+          _swapchain_images.at(image_index),
+          vk::ImageLayout::eTransferDstOptimal,
+          blit,
+          vk::Filter::eNearest
+      );
+      transition_image_layout(
+          _pp_front_image.image,
+          command_buffer,
+          vk::ImageLayout::eGeneral,
+          vk::ImageLayout::eColorAttachmentOptimal,
+          vk::AccessFlagBits2::eShaderStorageRead,
+          vk::AccessFlagBits2::eColorAttachmentWrite,
+          vk::PipelineStageFlagBits2::eComputeShader,
+          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+          vk::ImageAspectFlagBits::eColor
+      );
+      transition_image_layout(
+          _swapchain_images.at(image_index),
+          command_buffer,
+          vk::ImageLayout::eTransferDstOptimal,
+          vk::ImageLayout::ePresentSrcKHR,
+          vk::AccessFlagBits2::eTransferWrite,
+          {},
+          vk::PipelineStageFlagBits2::eBlit,
+          vk::PipelineStageFlagBits2::eBottomOfPipe,
+          vk::ImageAspectFlagBits::eColor
+      );
+    } else {
+      transition_image_layout(
+          _swapchain_images.at(image_index),
+          command_buffer,
+          vk::ImageLayout::eColorAttachmentOptimal,
+          vk::ImageLayout::ePresentSrcKHR,
+          vk::AccessFlagBits2::eColorAttachmentWrite,
+          {},
+          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+          vk::PipelineStageFlagBits2::eBottomOfPipe,
+          vk::ImageAspectFlagBits::eColor
+      );
+    }
 
     command_buffer.end();
   }
@@ -1284,15 +1568,23 @@ class vulkan_layer final : public Ilayer {
   gpu_image _pp_front_image;  // FOR POST PROCESSING
   gpu_image _pp_back_image;
 
-  vk::raii::Pipeline _graphics_pipeline = nullptr;
-  PushConstants _push_constants;
+  PC_graphics_properties _push_constants;
+  vk::raii::Pipeline _graphics_pipeline     = nullptr;
   vk::raii::PipelineLayout _pipeline_layout = nullptr;
+
+  vk::raii::Pipeline _compute_pipeline              = nullptr;
+  vk::raii::PipelineLayout _compute_pipeline_layout = nullptr;
 
   vk::raii::CommandPool _command_pool = nullptr;
 
-  vk::raii::DescriptorSetLayout _descriptor_set_layout = nullptr;
-  vk::raii::DescriptorPool _descriptor_pool            = nullptr;
-  vk::raii::DescriptorSets _descriptor_sets            = nullptr;
+  vk::raii::DescriptorSetLayout _descriptor_set_layout         = nullptr;
+  vk::raii::DescriptorPool _descriptor_pool                    = nullptr;
+  vk::raii::DescriptorSets _descriptor_sets                    = nullptr;
+  vk::raii::DescriptorSetLayout _compute_descriptor_set_layout = nullptr;
+  vk::raii::DescriptorPool _compute_descriptor_pool            = nullptr;
+  vk::raii::DescriptorSet _compute_descriptor_set              = nullptr;
+
+  vk::raii::ShaderModule _compute_shader_module = nullptr;
 
   vk::raii::DescriptorPool _imgui_descriptor_pool = nullptr;
 

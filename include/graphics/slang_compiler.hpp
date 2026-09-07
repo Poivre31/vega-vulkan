@@ -5,8 +5,10 @@
 #include <slang-com-helper.h>
 #include <sys/types.h>
 #include <cstdint>
+#include <exception>
 #include <fstream>
 #include <ios>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <io.hpp>
@@ -55,6 +57,106 @@ class slang_layer final : public Ilayer {
           reinterpret_cast<const char*>(diagnostics_blob->getBufferPointer())
       );
     }
+  }
+
+  static std::vector<char> compile_program(
+      const Slang::ComPtr<slang::ISession>& _session,
+      const char* shader_directory,
+      const char* shader_name,
+      const char* module_name,
+      const std::vector<const char*>& entry_point_names
+  ) {
+    // LOAD MODULE
+    auto shader_source = read_file(std::string(shader_directory) + shader_name);
+    Slang::ComPtr<slang::IModule> shader_module;
+    {
+      Slang::ComPtr<slang::IBlob> diagnostics;
+      const char* module_path = shader_name;
+      shader_module           = _session->loadModuleFromSourceString(
+          module_name, module_path, shader_source.c_str(), diagnostics.writeRef()
+      );
+      diagnose_if_needed(diagnostics);
+      if (!shader_module) {
+        _console->error("Module [{}] loading failed ('{}')", module_name, module_path);
+        throw std::runtime_error("");
+      } else {
+        _console->info("Loaded module [{}]", module_name);
+      }
+    }
+
+    // FIND ENTRY POINT
+    std::vector<Slang::ComPtr<slang::IEntryPoint>> entry_points;
+    {
+      Slang::ComPtr<slang::IBlob> diagnostics;
+      for (const char* entry_point_name : entry_point_names) {
+        entry_points.emplace_back(nullptr);
+        shader_module->findEntryPointByName(entry_point_name, entry_points.back().writeRef());
+        diagnose_if_needed(diagnostics);
+        if (!entry_points.back()) {
+          _console->error(
+              "Module [{}] failed to find entry point [{}]",
+              shader_module->getName(),
+              entry_point_name
+          );
+          throw std::runtime_error("");
+        }
+      }
+    }
+
+    std::vector<slang::IComponentType*> component_types{shader_module};
+    component_types.insert(component_types.end(), entry_points.begin(), entry_points.end());
+
+    Slang::ComPtr<slang::IComponentType> composed_program;
+    {
+      Slang::ComPtr<slang::IBlob> diagnostics;
+      auto result = _session->createCompositeComponentType(
+          component_types.data(),
+          SlangInt(component_types.size()),
+          composed_program.writeRef(),
+          diagnostics.writeRef()
+      );
+      diagnose_if_needed(diagnostics);
+      if (SLANG_FAILED(result)) {
+        _console->error("Shader program composition failed");
+        throw std::runtime_error("");
+      }
+    }
+
+    Slang::ComPtr<slang::IComponentType> linked_program;
+    {
+      Slang::ComPtr<slang::IBlob> diagnostics;
+      auto result = composed_program->link(linked_program.writeRef(), diagnostics.writeRef());
+      diagnose_if_needed(diagnostics);
+      if (SLANG_FAILED(result)) {
+        _console->error("Shader program link failed");
+        throw std::runtime_error("");
+      }
+    }
+
+    Slang::ComPtr<slang::IBlob> spirv_code;
+    {
+      Slang::ComPtr<slang::IBlob> diagnostics;
+      auto result = linked_program->getTargetCode(0, spirv_code.writeRef(), diagnostics.writeRef());
+      diagnose_if_needed(diagnostics);
+      if (SLANG_FAILED(result)) {
+        _console->error("Shader program spirv failed");
+        throw std::runtime_error("");
+      }
+    }
+
+    std::ofstream spirv_debug(
+        std::string(shader_directory) + module_name + std::string(".spv"), std::ios::binary
+    );
+    spirv_debug.write(
+        reinterpret_cast<const char*>(spirv_code->getBufferPointer()),
+        static_cast<std::streamsize>(spirv_code->getBufferSize())
+    );
+    spirv_debug.close();
+
+    return {
+        reinterpret_cast<const char*>(spirv_code->getBufferPointer()),
+        reinterpret_cast<const char*>(spirv_code->getBufferPointer()) + spirv_code->getBufferSize()
+    };
   }
 
   bool load_shaders() {
@@ -123,100 +225,22 @@ class slang_layer final : public Ilayer {
     _global_session->createSession(session_description, _session.writeRef());
 
     // LOAD MODULE
-    auto simple_shader = read_file("resources/shaders/lit_shader.slang");
-    Slang::ComPtr<slang::IModule> slang_module;
-    {
-      Slang::ComPtr<slang::IBlob> diagnostics;
-      const char* module_name = "simple";
-      const char* module_path = "simple.slang";
-      slang_module            = _session->loadModuleFromSourceString(
-          module_name, module_path, simple_shader.c_str(), diagnostics.writeRef()
+    try {
+      get_app_context()->shader_modules.clear();
+      get_app_context()->shader_modules.emplace_back(
+          std::move(compile_program(
+              _session, "resources/shaders/", "lit_shader.slang", "lit", {"fragMain", "vertMain"}
+          ))
       );
-      diagnose_if_needed(diagnostics);
-      if (!slang_module) {
-        _console->error("Module [{}] loading failed ('{}')", module_name, module_path);
-        return false;
-      } else {
-        _console->info("Loaded module [{}]", module_name);
-      }
-    }
-
-    // FIND ENTRY POINT
-    std::vector<Slang::ComPtr<slang::IEntryPoint>> entry_points;
-    {
-      Slang::ComPtr<slang::IBlob> diagnostics;
-      std::vector<const char*> entry_point_names{"vertMain", "fragMain"};
-      for (const char* entry_point_name : entry_point_names) {
-        entry_points.emplace_back(nullptr);
-        slang_module->findEntryPointByName(entry_point_name, entry_points.back().writeRef());
-        diagnose_if_needed(diagnostics);
-        if (!entry_points.back()) {
-          _console->error(
-              "Module [{}] failed to find entry point [{}]",
-              slang_module->getName(),
-              entry_point_name
-          );
-          return false;
-        }
-      }
-    }
-
-    std::vector<slang::IComponentType*> component_types{slang_module};
-    component_types.insert(component_types.end(), entry_points.begin(), entry_points.end());
-
-    Slang::ComPtr<slang::IComponentType> composed_program;
-    {
-      Slang::ComPtr<slang::IBlob> diagnostics;
-      auto result = _session->createCompositeComponentType(
-          component_types.data(),
-          SlangInt(component_types.size()),
-          composed_program.writeRef(),
-          diagnostics.writeRef()
+      get_app_context()->shader_modules.emplace_back(
+          std::move(compile_program(
+              _session, "resources/shaders/", "pp_shader.slang", "pp", {"computeMain"}
+          ))
       );
-      diagnose_if_needed(diagnostics);
-      if (SLANG_FAILED(result)) {
-        _console->error("Shader program composition failed");
-        return false;
-      }
+    } catch (std::exception e) {
+      _console->error("Failed to load, compile and link shaders, exiting program");
+      return false;
     }
-
-    Slang::ComPtr<slang::IComponentType> linked_program;
-    {
-      Slang::ComPtr<slang::IBlob> diagnostics;
-      auto result = composed_program->link(linked_program.writeRef(), diagnostics.writeRef());
-      diagnose_if_needed(diagnostics);
-      if (SLANG_FAILED(result)) {
-        _console->error("Shader program link failed");
-        return false;
-      }
-    }
-
-    Slang::ComPtr<slang::IBlob> spirv_code;
-    {
-      Slang::ComPtr<slang::IBlob> diagnostics;
-      auto result = linked_program->getTargetCode(0, spirv_code.writeRef(), diagnostics.writeRef());
-      diagnose_if_needed(diagnostics);
-      if (SLANG_FAILED(result)) {
-        _console->error("Shader program spirv failed");
-        return false;
-      }
-    }
-
-    std::ofstream spirv_debug(
-        std::string("resources/shaders/") + slang_module->getName() + std::string(".spv"),
-        std::ios::binary
-    );
-    spirv_debug.write(
-        reinterpret_cast<const char*>(spirv_code->getBufferPointer()),
-        static_cast<std::streamsize>(spirv_code->getBufferSize())
-    );
-    spirv_debug.close();
-
-    get_app_context()->shader_modules.clear();
-    get_app_context()->shader_modules.emplace_back(
-        reinterpret_cast<const char*>(spirv_code->getBufferPointer()),
-        reinterpret_cast<const char*>(spirv_code->getBufferPointer()) + spirv_code->getBufferSize()
-    );
 
     _console->info("Successfully loaded, compiled and linked shaders");
     return true;
