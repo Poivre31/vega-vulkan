@@ -1,9 +1,6 @@
 #pragma once
 
-#include <vector>
-
 #include "graphics/context.hpp"
-#include "graphics/image.hpp"
 
 #include "application/scene.hpp"
 #include "application/layer.hpp"
@@ -11,7 +8,6 @@
 #include "mesh_imports.hpp"
 #include "primitive_meshes.hpp"  // IWYU pragma: keep
 #include "texture_imports.hpp"
-#include "stb_image.hpp"
 
 class assets_layer final : public Ilayer {
  public:
@@ -61,8 +57,6 @@ class assets_layer final : public Ilayer {
 
     return true;
   }
-  void update(double dt) noexcept final {}
-  void cleanup() noexcept final {}
 
  private:
 };

@@ -7,6 +7,7 @@
 #include <timer/timer.hpp>
 #include <cstdint>
 #include <io.hpp>
+#include <unordered_map>
 
 #include "application/layer.hpp"
 #include "application/sdl.hpp"
@@ -18,6 +19,7 @@
 #include "config.hpp"
 #include "graphics/image_layout.hpp"
 #include "graphics/single_command_buffer.hpp"
+#include "imgui.h"
 #include "imgui_impl.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
@@ -28,6 +30,21 @@ struct PC_graphics_properties {
   vk::DeviceAddress material_buffer{};
   uint32_t material_count{};
   float time{};
+};
+
+struct PC_post_processing_data {
+  float time;
+  uint32_t frame;
+
+  float dithering_stength;
+
+  int blur_kernel_radius;
+  float blur_strength;
+
+  float exposure;
+  uint32_t srgb_transform;
+  float srgb_gamma;
+  float srgb_offset;
 };
 
 class vulkan_layer final : public Ilayer {
@@ -90,14 +107,39 @@ class vulkan_layer final : public Ilayer {
   void gui_update() noexcept final {
     ImGui::Begin("Vulkan settings");
 
-    ImGui::Text("Swapchain settings");
+    ImGui::Text("Rendering settings");
     if (ImGui::Checkbox("VSync", &_vk_context->config.vsync)) {
       _vk_context->recreate_swapchain     = true;
       get_app_context()->reset_dt_history = true;
     }
     ImGui::Checkbox("Post processing", &_vk_context->config.enable_post_processing);
 
-    ImGui::Text("Swapchain size");
+    static std::unordered_map<vk::Format, const char*> format_names{
+        {vk::Format::eA2B10G10R10UnormPack32, "Packed UNorm"},
+        {vk::Format::eB10G11R11UfloatPack32, "Packed UFloat"},
+        {vk::Format::eR16G16B16A16Sfloat, "16b SFloat"}
+    };
+
+    ImGui::Text("Rendering format :");
+    if (ImGui::BeginCombo(
+            "##raster format", format_names.at(_vk_context->config.raster_color_format)
+        )) {
+      for (auto& format : _vk_context->config.available_raster_format) {
+        bool is_selected = (_vk_context->config.raster_color_format == format);
+        if (ImGui::Selectable(format_names.at(format), is_selected)) {
+          _vk_context->config.raster_color_format = format;
+          _vk_context->recreate_swapchain         = true;
+          _vk_context->recreate_graphics_pipeline = true;
+          _vk_context->update_imgui               = true;
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    ImGui::Text("Swapchain size :");
     static int swapchain_size = int(_vk_context->config.swapchain_image_count);
     if (ImGui::SliderInt(
             "##swapchain size",
@@ -134,11 +176,23 @@ class vulkan_layer final : public Ilayer {
       _vk_context->recreate_graphics_pipeline = true;
     }
 
-    ImGui::Separator();
-    ImGui::Text("Pipeline settings");
-
     ImGui::Text("Clear color :");
     ImGui::ColorEdit4("##clear color", reinterpret_cast<float*>(&_vk_context->config.clear_color));
+
+    ImGui::Separator();
+    ImGui::Text("Post processing settings");
+    auto* pp = &_vk_context->config.post_processing;
+    ImGui::SliderFloat("Dithering", &pp->dithering_stength, 0.F, 1.F);
+
+    ImGui::SliderInt("Blur size", &pp->blur_kernel_radius, 0, 32);
+    ImGui::SliderFloat("Blur strength", &pp->blur_strength, 0.F, 10.F);
+
+    ImGui::SliderFloat(
+        "Exposure", &pp->exposure, 0.01F, 100.F, nullptr, ImGuiSliderFlags_Logarithmic
+    );
+    ImGui::Checkbox("Enable sRGB transform", &pp->srgb_transform);
+    ImGui::SliderFloat("sRGB gamma", &pp->srgb_gamma, 1.2F, 4.0F);
+    ImGui::SliderFloat("sRGB offset", &pp->srgb_offset, -1.F, 1.F);
 
     ImGui::End();
 
@@ -186,12 +240,21 @@ class vulkan_layer final : public Ilayer {
     if (_imgui_initialised) {
       imgui_cleanup();
     }
+    _swapchain = nullptr;
+    _swapchain_semaphores.clear();
+    _swapchain_views.clear();
+    _swapchain_images.clear();
+    _color_image.image    = nullptr;
+    _color_image.view     = nullptr;
+    _depth_image.image    = nullptr;
+    _depth_image.view     = nullptr;
+    _pp_front_image.image = nullptr;
+    _pp_front_image.view  = nullptr;
+    _pp_back_image.image  = nullptr;
+    _pp_back_image.view   = nullptr;
+
     *this = vulkan_layer(get_app_context());
 
-    _instance_running  = false;
-    _initialised       = false;
-    _imgui_initialised = false;
-    // *this              = vulkan_layer(get_app_context());
     console::get(consoles::graphics)->info("Cleaned-up Vulkan");
   }
 
@@ -664,7 +727,7 @@ class vulkan_layer final : public Ilayer {
       requested_image_count = std::min(requested_image_count, capabilities.maxImageCount);
     }
     _vk_context->config.min_swapchain_image_count = capabilities.minImageCount;
-    _vk_context->config.max_swapchain_image_count = std::min(capabilities.maxImageCount, 5U);
+    _vk_context->config.max_swapchain_image_count = std::max(capabilities.maxImageCount, 5U);
     _vk_context->config.swapchain_image_count     = requested_image_count;
 
     auto present_mode = get_present_mode();
@@ -1021,11 +1084,19 @@ class vulkan_layer final : public Ilayer {
         .module = _compute_shader_module,
         .pName  = "main"
     };
+    vk::PushConstantRange range{
+        .stageFlags = vk::ShaderStageFlagBits::eCompute,
+        .offset     = 0,
+        .size       = sizeof(PC_post_processing_data)
+    };
 
     vk::PipelineLayoutCreateInfo pipeline_layout_info{
-        .setLayoutCount = 1,
-        .pSetLayouts    = &*_compute_descriptor_set_layout,
+        .setLayoutCount         = 1,
+        .pSetLayouts            = &*_compute_descriptor_set_layout,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges    = &range
     };
+
     _compute_pipeline_layout = vk::raii::PipelineLayout(_device, pipeline_layout_info);
     if (!*_compute_pipeline_layout) {
       throw std::runtime_error("Compute pipeline layout creation silently failed");
@@ -1375,6 +1446,23 @@ class vulkan_layer final : public Ilayer {
           0,
           {*_compute_descriptor_set},
           {}
+      );
+      auto pp_data = _vk_context->config.post_processing;
+
+      PC_post_processing_data push_constants{
+          .time               = static_cast<float>(get_app_context()->time),
+          .frame              = static_cast<uint32_t>(get_app_context()->frame),
+          .dithering_stength  = pp_data.dithering_stength,
+          .blur_kernel_radius = pp_data.blur_kernel_radius,
+          .blur_strength      = pp_data.blur_strength,
+          .exposure           = pp_data.exposure,
+          .srgb_transform     = uint32_t(pp_data.srgb_transform),
+          .srgb_gamma         = pp_data.srgb_gamma,
+          .srgb_offset        = pp_data.srgb_offset
+      };
+
+      command_buffer.pushConstants<PC_post_processing_data>(
+          _compute_pipeline_layout, vk::ShaderStageFlagBits::eCompute, 0, push_constants
       );
 
       command_buffer.dispatch(

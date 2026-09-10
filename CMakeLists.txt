@@ -5,7 +5,7 @@ project(VegaVulkan)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+set(CMAKE_CXX_FLAGS_DEBUG "-O1 -g")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")
 
 add_executable(VegaVulkan)
@@ -37,6 +37,7 @@ target_sources(VegaVulkan PRIVATE
     "include/graphics/slang_compiler.hpp"
     "include/graphics/vulkan_layer.hpp"
     "include/graphics/image_layout.hpp"
+    "include/graphics/imgui_impl.hpp"
 
     "include/player/camera.hpp"
     "include/player/camera_layer.hpp"
@@ -51,7 +52,6 @@ target_sources(VegaVulkan PRIVATE
     "include/resources/primitive_meshes.hpp"
     "include/resources/stb_image.hpp"
     "include/resources/texture_imports.hpp"
-    include/graphics/imgui_impl.hpp
 )
 target_include_directories(VegaVulkan PRIVATE "include")
 

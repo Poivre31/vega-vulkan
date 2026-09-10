@@ -6,7 +6,7 @@ struct PushConstants {
   uint32_t material_count;
   float time;
 };
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<PushConstants> push_constants;
 
 uniform Sampler2D textures[];
@@ -90,6 +90,8 @@ VertexOutput vertMain(VSInput vertex) {
 
 [shader("fragment")]
 float4 fragMain(VertexOutput inVert) : SV_Target {
+  // return float4(float3(inVert.position.z/inVert.position.w),1);
+
   float intensity = clamp(dot(inVert.normal, -light_dir) / length(light_dir), 0, 1);
   float3 light    = intensity * light_color + ambient_color;
 
