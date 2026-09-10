@@ -7,13 +7,20 @@
 
 enum class layout_transition : uint8_t {
   dst_to_src,
-  src_to_shader_read,
-  dst_to_shader_read,
+  src_to_shader_sample_read,
+  dst_to_shader_sample_read,
   undef_to_src,
   undef_to_dst,
-  undef_to_color_attachment,
+  undef_to_color_attachment_write,
   undef_to_depth_attachment,
   undef_to_shader_storage_write,
+  color_attachment_write_to_shader_storage_read,
+  shader_storage_read_to_color_attachment_write,
+  src_to_shader_storage_write,
+  shader_storage_write_to_src_blit,
+  color_attachment_write_to_dst,
+  dst_blit_to_color_attachment_write,
+  color_attachment_write_to_present,
 };
 
 struct layout_transition_data {
@@ -35,7 +42,7 @@ const std::unordered_map<layout_transition, layout_transition_data> associated_t
          .src_stage  = vk::PipelineStageFlagBits2::eTransfer,
          .dst_stage  = vk::PipelineStageFlagBits2::eTransfer,
      }},
-    {layout_transition::src_to_shader_read,
+    {layout_transition::src_to_shader_sample_read,
      {
          .src_layout = vk::ImageLayout::eTransferSrcOptimal,
          .dst_layout = vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -44,7 +51,7 @@ const std::unordered_map<layout_transition, layout_transition_data> associated_t
          .src_stage  = vk::PipelineStageFlagBits2::eTransfer,
          .dst_stage  = vk::PipelineStageFlagBits2::eFragmentShader,
      }},
-    {layout_transition::dst_to_shader_read,
+    {layout_transition::dst_to_shader_sample_read,
      {
          .src_layout = vk::ImageLayout::eTransferDstOptimal,
          .dst_layout = vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -71,7 +78,7 @@ const std::unordered_map<layout_transition, layout_transition_data> associated_t
          .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,
          .dst_stage  = vk::PipelineStageFlagBits2::eTransfer,
      }},
-    {layout_transition::undef_to_color_attachment,
+    {layout_transition::undef_to_color_attachment_write,
      {
          .src_layout = vk::ImageLayout::eUndefined,
          .dst_layout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -97,7 +104,82 @@ const std::unordered_map<layout_transition, layout_transition_data> associated_t
          .src_stage  = vk::PipelineStageFlagBits2::eTopOfPipe,
          .dst_stage  = vk::PipelineStageFlagBits2::eComputeShader,
      }},
+    {layout_transition::color_attachment_write_to_shader_storage_read,
+     {
+         .src_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .dst_layout = vk::ImageLayout::eGeneral,
+         .src_access = vk::AccessFlagBits2::eColorAttachmentWrite,
+         .dst_access = vk::AccessFlagBits2::eShaderStorageRead,
+         .src_stage  = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+         .dst_stage  = vk::PipelineStageFlagBits2::eComputeShader,
+     }},
+    {layout_transition::shader_storage_read_to_color_attachment_write,
+     {
+         .src_layout = vk::ImageLayout::eGeneral,
+         .dst_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .src_access = vk::AccessFlagBits2::eShaderStorageRead,
+         .dst_access = vk::AccessFlagBits2::eColorAttachmentWrite,
+         .src_stage  = vk::PipelineStageFlagBits2::eComputeShader,
+         .dst_stage  = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+     }},
+    {layout_transition::src_to_shader_storage_write,
+     {
+         .src_layout = vk::ImageLayout::eTransferSrcOptimal,
+         .dst_layout = vk::ImageLayout::eGeneral,
+         .src_access = vk::AccessFlagBits2::eTransferRead,
+         .dst_access = vk::AccessFlagBits2::eShaderStorageWrite,
+         .src_stage  = vk::PipelineStageFlagBits2::eTransfer,
+         .dst_stage  = vk::PipelineStageFlagBits2::eComputeShader,
+     }},
+    {layout_transition::shader_storage_write_to_src_blit,
+     {
+         .src_layout = vk::ImageLayout::eGeneral,
+         .dst_layout = vk::ImageLayout::eTransferSrcOptimal,
+         .src_access = vk::AccessFlagBits2::eShaderStorageWrite,
+         .dst_access = vk::AccessFlagBits2::eTransferRead,
+         .src_stage  = vk::PipelineStageFlagBits2::eComputeShader,
+         .dst_stage  = vk::PipelineStageFlagBits2::eBlit,
+     }},
+    {layout_transition::color_attachment_write_to_dst,
+     {
+         .src_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .dst_layout = vk::ImageLayout::eTransferDstOptimal,
+         .src_access = vk::AccessFlagBits2::eColorAttachmentWrite,
+         .dst_access = vk::AccessFlagBits2::eTransferWrite,
+         .src_stage  = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+         .dst_stage  = vk::PipelineStageFlagBits2::eTransfer,
+     }},
+    {layout_transition::dst_blit_to_color_attachment_write,
+     {
+         .src_layout = vk::ImageLayout::eTransferDstOptimal,
+         .dst_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .src_access = vk::AccessFlagBits2::eTransferWrite,
+         .dst_access = vk::AccessFlagBits2::eColorAttachmentWrite,
+         .src_stage  = vk::PipelineStageFlagBits2::eBlit,
+         .dst_stage  = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+     }},
+    {layout_transition::color_attachment_write_to_present,
+     {
+         .src_layout = vk::ImageLayout::eColorAttachmentOptimal,
+         .dst_layout = vk::ImageLayout::ePresentSrcKHR,
+         .src_access = vk::AccessFlagBits2::eColorAttachmentWrite,
+         .dst_access = {},
+         .src_stage  = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+         .dst_stage  = vk::PipelineStageFlagBits2::eBottomOfPipe,
+     }},
 };
+
+//   transition_image_layout(
+//       _swapchain_images.at(image_index),
+//       command_buffer,
+//       vk::ImageLayout::eTransferDstOptimal,
+//       vk::ImageLayout::eColorAttachmentOptimal,
+//       vk::AccessFlagBits2::eTransferWrite,
+//       vk::AccessFlagBits2::eColorAttachmentWrite,
+//       vk::PipelineStageFlagBits2::eBlit,
+//       vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+//       vk::ImageAspectFlagBits::eColor
+//   );
 
 void transition_image_layout(
     const vk::Image& image,

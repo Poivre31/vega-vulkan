@@ -99,13 +99,15 @@ void generate_mip_maps(
         vk::Filter::eLinear
     );
 
-    transition_image_mip_layout(texture, cmd, layout_transition::src_to_shader_read, mip_level - 1);
+    transition_image_mip_layout(
+        texture, cmd, layout_transition::src_to_shader_sample_read, mip_level - 1
+    );
 
     mip_width  = std::max(mip_width / 2, 1U);
     mip_height = std::max(mip_height / 2, 1U);
   }
   transition_image_mip_layout(
-      texture, cmd, layout_transition::dst_to_shader_read, texture.mip_level_count - 1
+      texture, cmd, layout_transition::dst_to_shader_sample_read, texture.mip_level_count - 1
   );
 
   texture.layout = vk::ImageLayout::eShaderReadOnlyOptimal;

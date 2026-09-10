@@ -112,7 +112,11 @@ class vulkan_layer final : public Ilayer {
       _vk_context->recreate_swapchain     = true;
       get_app_context()->reset_dt_history = true;
     }
-    ImGui::Checkbox("Post processing", &_vk_context->config.enable_post_processing);
+    if (ImGui::Checkbox("Post processing", &_vk_context->config.enable_post_processing)) {
+      _vk_context->recreate_swapchain         = true;
+      _vk_context->recreate_graphics_pipeline = true;
+      _vk_context->update_imgui               = true;
+    }
 
     static std::unordered_map<vk::Format, const char*> format_names{
         {vk::Format::eB8G8R8A8Unorm, "8b UNorm"},
@@ -1015,10 +1019,20 @@ class vulkan_layer final : public Ilayer {
 
     vk::PipelineRenderingCreateInfo pipeline_rendering_info{
         .colorAttachmentCount    = 1,
-        .pColorAttachmentFormats = &_vk_context->config.raster_color_format,
+        .pColorAttachmentFormats = _vk_context->config.enable_post_processing
+                                       ? &_vk_context->config.raster_color_format
+                                       : &_vk_context->config.present_color_format,
         .depthAttachmentFormat   = _vk_context->config.depth_format
     };
-
+    if (!_vk_context->config.enable_post_processing
+        && _vk_context->config.raster_color_format != _vk_context->config.present_color_format) {
+      _console->warn(
+          "Post processing is disabled to image is resolved to swapchain presentation directly but "
+          "rasterisation and presentations foramts don't match. Rasterisation format is only used "
+          "when post processing is enabled, set it identical to presentation format to silence "
+          "this warning."
+      );
+    }
     vk::StructureChain<
         vk::GraphicsPipelineCreateInfo,
         vk::PipelineRenderingCreateInfo>
@@ -1134,7 +1148,8 @@ class vulkan_layer final : public Ilayer {
       _color_image = create_image(
           _allocator,
           _device,
-          _vk_context->config.raster_color_format,
+          _vk_context->config.enable_post_processing ? _vk_context->config.raster_color_format
+                                                     : _vk_context->config.present_color_format,
           _swapchain_extent.width,
           _swapchain_extent.height,
           vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
@@ -1144,7 +1159,7 @@ class vulkan_layer final : public Ilayer {
           _vk_context->config.msaa_sample_count
       );
       transition_image_global_layout(
-          _color_image, cmd, layout_transition::undef_to_color_attachment
+          _color_image, cmd, layout_transition::undef_to_color_attachment_write
       );
     }
 
@@ -1191,7 +1206,7 @@ class vulkan_layer final : public Ilayer {
 
     auto cmd = begin_transient_command_buffer(_command_pool, _device);
     transition_image_global_layout(
-        _pp_front_image, cmd, layout_transition::undef_to_color_attachment
+        _pp_front_image, cmd, layout_transition::undef_to_color_attachment_write
     );
     transition_image_global_layout(_pp_back_image, cmd, layout_transition::undef_to_src);
     submit_transient_command_buffer(_graphics_queue, std::move(cmd));
@@ -1331,12 +1346,7 @@ class vulkan_layer final : public Ilayer {
     transition_image_layout(
         _swapchain_images.at(image_index),
         command_buffer,
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        {},
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        layout_transition::undef_to_color_attachment_write,
         vk::ImageAspectFlagBits::eColor
     );
 
@@ -1420,27 +1430,14 @@ class vulkan_layer final : public Ilayer {
     command_buffer.endRendering();
 
     if (_vk_context->config.enable_post_processing) {
-      transition_image_layout(
-          _pp_front_image.image,
+      transition_image_global_layout(
+          _pp_front_image,
           command_buffer,
-          vk::ImageLayout::eColorAttachmentOptimal,
-          vk::ImageLayout::eGeneral,
-          vk::AccessFlagBits2::eColorAttachmentWrite,
-          vk::AccessFlagBits2::eShaderStorageRead,
-          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-          vk::PipelineStageFlagBits2::eComputeShader,
-          vk::ImageAspectFlagBits::eColor
+          layout_transition::color_attachment_write_to_shader_storage_read
       );
-      transition_image_layout(
-          _pp_back_image.image,
-          command_buffer,
-          vk::ImageLayout::eTransferSrcOptimal,
-          vk::ImageLayout::eGeneral,
-          vk::AccessFlagBits2::eTransferRead,
-          vk::AccessFlagBits2::eShaderStorageWrite,
-          vk::PipelineStageFlagBits2::eTransfer,
-          vk::PipelineStageFlagBits2::eComputeShader,
-          vk::ImageAspectFlagBits::eColor
+
+      transition_image_global_layout(
+          _pp_back_image, command_buffer, layout_transition::src_to_shader_storage_write
       );
 
       command_buffer.bindPipeline(vk::PipelineBindPoint::eCompute, _compute_pipeline);
@@ -1473,26 +1470,13 @@ class vulkan_layer final : public Ilayer {
           (_swapchain_extent.width + 7) / 8, (_swapchain_extent.height + 7) / 8, 1
       );
 
-      transition_image_layout(
-          _pp_back_image.image,
-          command_buffer,
-          vk::ImageLayout::eGeneral,
-          vk::ImageLayout::eTransferSrcOptimal,
-          vk::AccessFlagBits2::eShaderStorageWrite,
-          vk::AccessFlagBits2::eTransferRead,
-          vk::PipelineStageFlagBits2::eComputeShader,
-          vk::PipelineStageFlagBits2::eBlit,
-          vk::ImageAspectFlagBits::eColor
+      transition_image_global_layout(
+          _pp_back_image, command_buffer, layout_transition::shader_storage_write_to_src_blit
       );
       transition_image_layout(
           _swapchain_images.at(image_index),
           command_buffer,
-          vk::ImageLayout::eColorAttachmentOptimal,
-          vk::ImageLayout::eTransferDstOptimal,
-          vk::AccessFlagBits2::eColorAttachmentWrite,
-          vk::AccessFlagBits2::eTransferWrite,
-          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-          vk::PipelineStageFlagBits2::eTransfer,
+          layout_transition::color_attachment_write_to_dst,
           vk::ImageAspectFlagBits::eColor
       );
 
@@ -1522,27 +1506,16 @@ class vulkan_layer final : public Ilayer {
           blit,
           vk::Filter::eNearest
       );
-      transition_image_layout(
-          _pp_front_image.image,
+      transition_image_global_layout(
+          _pp_front_image,
           command_buffer,
-          vk::ImageLayout::eGeneral,
-          vk::ImageLayout::eColorAttachmentOptimal,
-          vk::AccessFlagBits2::eShaderStorageRead,
-          vk::AccessFlagBits2::eColorAttachmentWrite,
-          vk::PipelineStageFlagBits2::eComputeShader,
-          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-          vk::ImageAspectFlagBits::eColor
+          layout_transition::shader_storage_read_to_color_attachment_write
       );
 
       transition_image_layout(
           _swapchain_images.at(image_index),
           command_buffer,
-          vk::ImageLayout::eTransferDstOptimal,
-          vk::ImageLayout::eColorAttachmentOptimal,
-          vk::AccessFlagBits2::eTransferWrite,
-          vk::AccessFlagBits2::eColorAttachmentWrite,
-          vk::PipelineStageFlagBits2::eBlit,
-          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+          layout_transition::dst_blit_to_color_attachment_write,
           vk::ImageAspectFlagBits::eColor
       );
     }
@@ -1569,12 +1542,7 @@ class vulkan_layer final : public Ilayer {
     transition_image_layout(
         _swapchain_images.at(image_index),
         command_buffer,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::ePresentSrcKHR,
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-        {},
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eBottomOfPipe,
+        layout_transition::color_attachment_write_to_present,
         vk::ImageAspectFlagBits::eColor
     );
 

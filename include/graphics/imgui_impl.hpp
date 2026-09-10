@@ -20,13 +20,7 @@ static void check_vk_result(VkResult err) {
   }
 }
 
-void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io     = ImGui::GetIO();
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
+void imgui_init_vulkan_impl_(SDL_Window* window, vulkan_context& vk_context) {
   ImGui_ImplSDL3_InitForVulkan(window);
   auto format = VkFormat(vk_context.config.present_color_format);
   ImGui_ImplVulkan_InitInfo init_info{
@@ -52,7 +46,20 @@ void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
       .Allocator           = *vk_context.allocator->getAllocationCallbacks(),
       .CheckVkResultFn     = check_vk_result,
   };
-  ImGui_ImplVulkan_Init(&init_info);
+
+  if (!ImGui_ImplVulkan_Init(&init_info)) {
+    throw std::runtime_error("Imgui Vulkan init has failed");
+  }
+}
+
+void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO& io     = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+  imgui_init_vulkan_impl_(window, vk_context);
 }
 
 void imgui_begin_frame() {
@@ -86,35 +93,7 @@ void imgui_update_vulkan(SDL_Window* window, vulkan_context& vk_context) {
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyPlatformWindows();
 
-  ImGui_ImplSDL3_InitForVulkan(window);
-
-  auto format = VkFormat(vk_context.config.present_color_format);
-  ImGui_ImplVulkan_InitInfo init_info{
-      .Instance       = **vk_context.instance,
-      .PhysicalDevice = **vk_context.physical_device,
-      .Device         = **vk_context.device,
-      .QueueFamily    = vk_context.graphics_queue_family,
-      .Queue          = **vk_context.graphics_queue,
-      .DescriptorPool = **vk_context.imgui_descriptor_pool,
-      .MinImageCount  = vk_context.config.swapchain_image_count,
-      .ImageCount     = vk_context.config.swapchain_image_count,
-      .PipelineCache  = VK_NULL_HANDLE,
-      .PipelineInfoMain =
-          ImGui_ImplVulkan_PipelineInfo{
-              .RenderPass  = NULL,
-              .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-              .PipelineRenderingCreateInfo =
-                  {.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-                   .colorAttachmentCount    = 1,
-                   .pColorAttachmentFormats = &format},
-          },
-      .UseDynamicRendering = vk::True,
-      .Allocator           = *vk_context.allocator->getAllocationCallbacks(),
-      .CheckVkResultFn     = check_vk_result,
-  };
-  if (!ImGui_ImplVulkan_Init(&init_info)) {
-    throw std::runtime_error("Imgui update has failed");
-  }
+  imgui_init_vulkan_impl_(window, vk_context);
 
   vk_context.update_imgui = false;
 }
