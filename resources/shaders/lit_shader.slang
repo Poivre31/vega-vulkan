@@ -19,8 +19,8 @@ struct Material {
 // uniform StructuredBuffer<Material>.Handle materials;
 
 static float3 light_dir     = float3(-0.2, -0.3, -1);
-static float4 light_color   = float4(1., 0.8, 0.6, 1);
-static float4 ambient_color = float4(0.03, 0.08, 0.2, 1);
+static float3 light_color   = float3(1., 0.8, 0.6);
+static float3 ambient_color = float3(0.03, 0.08, 0.2);
 
 struct VSInput {
   float3 position;
@@ -56,8 +56,11 @@ float3 randFloat3(float a, float b, uint seed) {
   );
 }
 
-float4 linear_to_srgb(float4 x) {
+float3 linear_to_srgb(float3 x) {
   return select(x <= 0.0031308, 12.92 * x, 1.055 * pow(x, 1. / 2.4) - 0.055);
+}
+float4 linear_to_srgb(float4 x) {
+  return float4(linear_to_srgb(x.rgb), x.a);
 }
 
 [shader("vertex")]
@@ -88,7 +91,7 @@ VertexOutput vertMain(VSInput vertex) {
 [shader("fragment")]
 float4 fragMain(VertexOutput inVert) : SV_Target {
   float intensity = clamp(dot(inVert.normal, -light_dir) / length(light_dir), 0, 1);
-  float4 light    = intensity * light_color + ambient_color;
+  float3 light    = intensity * light_color + ambient_color;
 
   if (inVert.material.texture_id >= push_constants.material_count
       && inVert.material.texture_id != -1U) {
@@ -102,6 +105,5 @@ float4 fragMain(VertexOutput inVert) : SV_Target {
     );
   }
   albedo.a = 1;
-
-  return linear_to_srgb(albedo * light);
+  return albedo * float4(light, 1);
 }

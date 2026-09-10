@@ -28,8 +28,7 @@ void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
   ImGui_ImplSDL3_InitForVulkan(window);
-  auto format = VkFormat(vk_context.config.color_format);
-  auto depth  = VkFormat(vk_context.config.depth_format);
+  auto format = VkFormat(vk_context.config.present_color_format);
   ImGui_ImplVulkan_InitInfo init_info{
       .Instance       = **vk_context.instance,
       .PhysicalDevice = **vk_context.physical_device,
@@ -43,14 +42,11 @@ void imgui_init(SDL_Window* window, vulkan_context& vk_context) {
       .PipelineInfoMain =
           ImGui_ImplVulkan_PipelineInfo{
               .RenderPass  = NULL,
-              .MSAASamples = static_cast<VkSampleCountFlagBits>(
-                  static_cast<VkFlags>(vk_context.config.msaa_sample_count)
-              ),
+              .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
               .PipelineRenderingCreateInfo =
                   {.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
                    .colorAttachmentCount    = 1,
-                   .pColorAttachmentFormats = &format,
-                   .depthAttachmentFormat   = depth},
+                   .pColorAttachmentFormats = &format},
           },
       .UseDynamicRendering = vk::True,
       .Allocator           = *vk_context.allocator->getAllocationCallbacks(),
@@ -92,8 +88,7 @@ void imgui_update_vulkan(SDL_Window* window, vulkan_context& vk_context) {
 
   ImGui_ImplSDL3_InitForVulkan(window);
 
-  auto format = VkFormat(vk_context.config.color_format);
-  auto depth  = VkFormat(vk_context.config.depth_format);
+  auto format = VkFormat(vk_context.config.present_color_format);
   ImGui_ImplVulkan_InitInfo init_info{
       .Instance       = **vk_context.instance,
       .PhysicalDevice = **vk_context.physical_device,
@@ -107,14 +102,11 @@ void imgui_update_vulkan(SDL_Window* window, vulkan_context& vk_context) {
       .PipelineInfoMain =
           ImGui_ImplVulkan_PipelineInfo{
               .RenderPass  = NULL,
-              .MSAASamples = static_cast<VkSampleCountFlagBits>(
-                  static_cast<VkFlags>(vk_context.config.msaa_sample_count)
-              ),
+              .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
               .PipelineRenderingCreateInfo =
                   {.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
                    .colorAttachmentCount    = 1,
-                   .pColorAttachmentFormats = &format,
-                   .depthAttachmentFormat   = depth},
+                   .pColorAttachmentFormats = &format},
           },
       .UseDynamicRendering = vk::True,
       .Allocator           = *vk_context.allocator->getAllocationCallbacks(),

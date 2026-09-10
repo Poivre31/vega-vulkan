@@ -95,6 +95,7 @@ class vulkan_layer final : public Ilayer {
       _vk_context->recreate_swapchain     = true;
       get_app_context()->reset_dt_history = true;
     }
+    ImGui::Checkbox("Post processing", &_vk_context->config.enable_post_processing);
 
     ImGui::Text("Swapchain size");
     static int swapchain_size = int(_vk_context->config.swapchain_image_count);
@@ -326,8 +327,8 @@ class vulkan_layer final : public Ilayer {
 
     std::string error_message("Surface format choosed is not available, choose among:");
     for (const auto& format : available) {
-      if (format.format == _vk_context->config.color_format
-          && format.colorSpace == _vk_context->config.color_space) {
+      if (format.format == _vk_context->config.present_color_format
+          && format.colorSpace == _vk_context->config.present_color_space) {
         return format;
       }
       error_message += "\n  -" + vk::to_string(format.format) + " "
@@ -674,10 +675,8 @@ class vulkan_layer final : public Ilayer {
       );
     }
 
-    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment;
-    if (vulkan_config::enable_post_processing) {
-      usage |= vk::ImageUsageFlagBits::eTransferDst;
-    }
+    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment
+                                | vk::ImageUsageFlagBits::eTransferDst;
     vk::SwapchainCreateInfoKHR swapchain_info{
         .surface          = *_surface,
         .minImageCount    = requested_image_count,
@@ -936,9 +935,20 @@ class vulkan_layer final : public Ilayer {
         .renderPass          = nullptr,
     };
 
+    if (!(_physical_device.getFormatProperties2(_vk_context->config.raster_color_format)
+              .formatProperties.linearTilingFeatures
+          & vk::FormatFeatureFlagBits::eColorAttachmentBlend)) {
+      _console->error(
+          "Intermediate rasterisation image format {} is not supported, fallback to {}",
+          vk::to_string(_vk_context->config.raster_color_format),
+          vk::to_string(vk::Format::eB8G8R8A8Unorm)
+      );
+      _vk_context->config.raster_color_format = vk::Format::eB8G8R8A8Unorm;
+    }
+
     vk::PipelineRenderingCreateInfo pipeline_rendering_info{
         .colorAttachmentCount    = 1,
-        .pColorAttachmentFormats = &_swapchain_format.format,
+        .pColorAttachmentFormats = &_vk_context->config.raster_color_format,
         .depthAttachmentFormat   = _vk_context->config.depth_format
     };
 
@@ -1049,7 +1059,7 @@ class vulkan_layer final : public Ilayer {
       _color_image = create_image(
           _allocator,
           _device,
-          _vk_context->config.color_format,
+          _vk_context->config.raster_color_format,
           _swapchain_extent.width,
           _swapchain_extent.height,
           vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
@@ -1084,7 +1094,7 @@ class vulkan_layer final : public Ilayer {
     _pp_front_image = create_image(
         _allocator,
         _device,
-        _vk_context->config.color_format,
+        _vk_context->config.raster_color_format,
         _swapchain_extent.width,
         _swapchain_extent.height,
         vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
@@ -1095,7 +1105,7 @@ class vulkan_layer final : public Ilayer {
     _pp_back_image = create_image(
         _allocator,
         _device,
-        _vk_context->config.color_format,
+        _vk_context->config.raster_color_format,
         _swapchain_extent.width,
         _swapchain_extent.height,
         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage
@@ -1256,7 +1266,7 @@ class vulkan_layer final : public Ilayer {
     );
 
     vk::RenderingAttachmentInfo color_attachment_info;
-    const auto& render_target = vulkan_config::enable_post_processing
+    const auto& render_target = _vk_context->config.enable_post_processing
                                     ? _pp_front_image.view
                                     : _swapchain_views.at(image_index);
 
@@ -1288,7 +1298,7 @@ class vulkan_layer final : public Ilayer {
         .clearValue  = _vk_context->config.clear_depth
     };
 
-    vk::RenderingInfo renderingInfo{
+    vk::RenderingInfo scene_rendering_info{
         .renderArea           = {.offset = {.x = 0, .y = 0}, .extent = _swapchain_extent},
         .layerCount           = 1,
         .colorAttachmentCount = 1,
@@ -1296,7 +1306,7 @@ class vulkan_layer final : public Ilayer {
         .pDepthAttachment     = &depth_attachment_info,
     };
 
-    command_buffer.beginRendering(renderingInfo);
+    command_buffer.beginRendering(scene_rendering_info);
 
     command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *_graphics_pipeline);
 
@@ -1332,11 +1342,9 @@ class vulkan_layer final : public Ilayer {
       mesh.render(command_buffer);
     }
 
-    imgui_end_frame(_command_buffers.at(_frame_index));
-
     command_buffer.endRendering();
 
-    if (vulkan_config::enable_post_processing) {
+    if (_vk_context->config.enable_post_processing) {
       transition_image_layout(
           _pp_front_image.image,
           command_buffer,
@@ -1433,30 +1441,50 @@ class vulkan_layer final : public Ilayer {
           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
           vk::ImageAspectFlagBits::eColor
       );
+
       transition_image_layout(
           _swapchain_images.at(image_index),
           command_buffer,
           vk::ImageLayout::eTransferDstOptimal,
-          vk::ImageLayout::ePresentSrcKHR,
-          vk::AccessFlagBits2::eTransferWrite,
-          {},
-          vk::PipelineStageFlagBits2::eBlit,
-          vk::PipelineStageFlagBits2::eBottomOfPipe,
-          vk::ImageAspectFlagBits::eColor
-      );
-    } else {
-      transition_image_layout(
-          _swapchain_images.at(image_index),
-          command_buffer,
           vk::ImageLayout::eColorAttachmentOptimal,
-          vk::ImageLayout::ePresentSrcKHR,
+          vk::AccessFlagBits2::eTransferWrite,
           vk::AccessFlagBits2::eColorAttachmentWrite,
-          {},
+          vk::PipelineStageFlagBits2::eBlit,
           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-          vk::PipelineStageFlagBits2::eBottomOfPipe,
           vk::ImageAspectFlagBits::eColor
       );
     }
+
+    vk::RenderingAttachmentInfo imgui_color_attachment_info = {
+        .imageView   = *_swapchain_views.at(image_index),
+        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .loadOp      = vk::AttachmentLoadOp::eLoad,
+        .storeOp     = vk::AttachmentStoreOp::eStore,
+        .clearValue  = _vk_context->config.clear_color
+    };
+
+    vk::RenderingInfo ui_rendering_info{
+        .renderArea           = {.offset = {.x = 0, .y = 0}, .extent = _swapchain_extent},
+        .layerCount           = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments    = &imgui_color_attachment_info,
+        .pDepthAttachment     = nullptr,
+    };
+    command_buffer.beginRendering(ui_rendering_info);
+    imgui_end_frame(command_buffer);
+    command_buffer.endRendering();
+
+    transition_image_layout(
+        _swapchain_images.at(image_index),
+        command_buffer,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageLayout::ePresentSrcKHR,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        {},
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::PipelineStageFlagBits2::eBottomOfPipe,
+        vk::ImageAspectFlagBits::eColor
+    );
 
     command_buffer.end();
   }

@@ -4,14 +4,15 @@
 #include "vulkan/vulkan.hpp"
 
 struct dynamic_config {
-  vk::Format color_format       = vk::Format::eB8G8R8A8Unorm;
-  vk::ColorSpaceKHR color_space = vk::ColorSpaceKHR::eSrgbNonlinear;
-  vk::Format depth_format       = vk::Format::eD32Sfloat;
+  vk::Format present_color_format       = vk::Format::eB8G8R8A8Unorm;
+  vk::ColorSpaceKHR present_color_space = vk::ColorSpaceKHR::eSrgbNonlinear;
+  vk::Format depth_format               = vk::Format::eD32Sfloat;
+  vk::Format raster_color_format        = vk::Format::eB10G11R11UfloatPack32;
 
   uint32_t min_swapchain_image_count{};
   uint32_t max_swapchain_image_count{};
   uint32_t swapchain_image_count = 3;
-  bool vsync                     = false;
+  bool vsync                     = true;
 
   vk::ClearValue clear_color = vk::ClearColorValue(0.F, 0.F, 0.F, 0.F);
   vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.F, 0);
@@ -19,6 +20,8 @@ struct dynamic_config {
   vk::SampleCountFlagBits msaa_sample_count = vk::SampleCountFlagBits::e4;
   std::vector<vk::SampleCountFlagBits> available_msaa_sample_counts;
   float msaa_shading_rate = 0.3F;
+
+  bool enable_post_processing = true;
 };
 
 namespace vulkan_config {
@@ -47,7 +50,5 @@ const std::string shader_path = "resources/shaders/lit_shader.spv";
 constexpr uint32_t max_number_of_textures = 512;
 
 constexpr uint32_t frames_in_flight = 2;
-
-constexpr bool enable_post_processing = true;
 
 }  // namespace vulkan_config
