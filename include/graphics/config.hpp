@@ -10,6 +10,7 @@ struct dynamic_config {
   vk::Format depth_format               = vk::Format::eD32Sfloat;
   vk::Format raster_color_format        = vk::Format::eR16G16B16A16Sfloat;
   std::vector<vk::Format> available_raster_format{
+      vk::Format::eB8G8R8A8Unorm,
       vk::Format::eA2B10G10R10UnormPack32,
       vk::Format::eB10G11R11UfloatPack32,
       vk::Format::eR16G16B16A16Sfloat,

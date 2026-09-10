@@ -115,6 +115,7 @@ class vulkan_layer final : public Ilayer {
     ImGui::Checkbox("Post processing", &_vk_context->config.enable_post_processing);
 
     static std::unordered_map<vk::Format, const char*> format_names{
+        {vk::Format::eB8G8R8A8Unorm, "8b UNorm"},
         {vk::Format::eA2B10G10R10UnormPack32, "Packed UNorm"},
         {vk::Format::eB10G11R11UfloatPack32, "Packed UFloat"},
         {vk::Format::eR16G16B16A16Sfloat, "16b SFloat"}
@@ -727,8 +728,11 @@ class vulkan_layer final : public Ilayer {
       requested_image_count = std::min(requested_image_count, capabilities.maxImageCount);
     }
     _vk_context->config.min_swapchain_image_count = capabilities.minImageCount;
-    _vk_context->config.max_swapchain_image_count = std::max(capabilities.maxImageCount, 5U);
-    _vk_context->config.swapchain_image_count     = requested_image_count;
+    _vk_context->config.max_swapchain_image_count = std::min(capabilities.maxImageCount, 5U);
+    if (_vk_context->config.max_swapchain_image_count == 0) {
+      _vk_context->config.max_swapchain_image_count = 5U;
+    }
+    _vk_context->config.swapchain_image_count = requested_image_count;
 
     auto present_mode = get_present_mode();
     if (present_mode == vk::PresentModeKHR::eImmediate) {
