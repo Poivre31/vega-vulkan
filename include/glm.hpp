@@ -7,3 +7,4 @@
 #include <glm/ext/matrix_transform.hpp>   // IWYU pragma: export
 #include <glm/ext/matrix_clip_space.hpp>  // IWYU pragma: export
 #include <glm/gtc/random.hpp>             // IWYU pragma: export
+#include <glm/gtx/string_cast.hpp>        // IWYU pragma: export

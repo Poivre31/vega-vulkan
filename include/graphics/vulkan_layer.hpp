@@ -12,39 +12,20 @@
 #include "application/layer.hpp"
 #include "application/sdl.hpp"
 
-#include "graphics/gpu_objects.hpp"
-#include "graphics/image.hpp"
+#include "gpu_objects.hpp"
+#include "image.hpp"
 #include "graphics.hpp"
 #include "context.hpp"
 #include "config.hpp"
-#include "graphics/image_layout.hpp"
-#include "graphics/single_command_buffer.hpp"
-#include "imgui.h"
-#include "imgui_impl.hpp"
-#include "vulkan/vulkan.hpp"
-#include "vulkan/vulkan_raii.hpp"
-#include "vulkan/vulkan_to_string.hpp"
+#include "image_layout.hpp"
+#include "single_command_buffer.hpp"
+#include "compute_shader.hpp"
 
 struct PC_graphics_properties {
   glm::mat4x4 view_projection_matrix{};
   vk::DeviceAddress material_buffer{};
   uint32_t material_count{};
   float time{};
-};
-
-struct PC_post_processing_data {
-  float time;
-  uint32_t frame;
-
-  float dithering_stength;
-
-  int blur_kernel_radius;
-  float blur_strength;
-
-  float exposure;
-  uint32_t srgb_transform;
-  float srgb_gamma;
-  float srgb_offset;
 };
 
 class vulkan_layer final : public Ilayer {
@@ -70,7 +51,7 @@ class vulkan_layer final : public Ilayer {
       create_swapchain();
       create_descriptor_set_layouts();
       create_graphics_pipeline();
-      create_compute_pipeline();
+      create_post_processing_shader();
       create_command_pool();
       create_depth_resources();
       create_post_processing_resources();
@@ -107,7 +88,9 @@ class vulkan_layer final : public Ilayer {
   void gui_update() noexcept final {
     ImGui::Begin("Vulkan settings");
 
+    ImGui::Separator();
     ImGui::Text("Rendering settings");
+    ImGui::Separator();
     if (ImGui::Checkbox("VSync", &_vk_context->config.vsync)) {
       _vk_context->recreate_swapchain     = true;
       get_app_context()->reset_dt_history = true;
@@ -186,18 +169,31 @@ class vulkan_layer final : public Ilayer {
 
     ImGui::Separator();
     ImGui::Text("Post processing settings");
+
+    ImGui::Separator();
+    ImGui::Text("General :");
     auto* pp = &_vk_context->config.post_processing;
     ImGui::SliderFloat("Dithering", &pp->dithering_stength, 0.F, 1.F);
 
     ImGui::SliderInt("Blur size", &pp->blur_kernel_radius, 0, 32);
     ImGui::SliderFloat("Blur strength", &pp->blur_strength, 0.F, 10.F);
 
+    ImGui::Separator();
+    ImGui::Text("Lighting :");
     ImGui::SliderFloat(
         "Exposure", &pp->exposure, 0.01F, 100.F, nullptr, ImGuiSliderFlags_Logarithmic
     );
     ImGui::Checkbox("Enable sRGB transform", &pp->srgb_transform);
     ImGui::SliderFloat("sRGB gamma", &pp->srgb_gamma, 1.2F, 4.0F);
     ImGui::SliderFloat("sRGB offset", &pp->srgb_offset, -1.F, 1.F);
+
+    ImGui::Separator();
+    ImGui::Text("Fog :");
+    ImGui::Checkbox("Enable fog", &pp->enable_fog);
+    ImGui::ColorEdit3("Fog color", &pp->fog_color.r);
+    ImGui::SliderFloat(
+        "Fog falloff", &pp->fog_falloff, 10.F, 10000.F, nullptr, ImGuiSliderFlags_Logarithmic
+    );
 
     ImGui::End();
 
@@ -821,36 +817,10 @@ class vulkan_layer final : public Ilayer {
       create_swapchain();
       create_depth_resources();
       create_post_processing_resources();
-      std::vector<vk::WriteDescriptorSet> write_descriptor_sets;
-      vk::DescriptorImageInfo front_image_descriptor{
-          .sampler     = nullptr,
-          .imageView   = _pp_front_image.view,
-          .imageLayout = vk::ImageLayout::eGeneral
-      };
-      write_descriptor_sets.push_back(
-          {.dstSet          = _compute_descriptor_set,
-           .dstBinding      = 0,
-           .dstArrayElement = 0,
-           .descriptorCount = 1,
-           .descriptorType  = vk::DescriptorType::eStorageImage,
-           .pImageInfo      = &front_image_descriptor}
+      _pp_compute_shader.update_descriptor_sets(
+          _device, {&_depth_buffer}, {&_pp_front_image, &_pp_back_image}, {}
       );
 
-      vk::DescriptorImageInfo back_image_descriptor = {
-          .sampler     = nullptr,
-          .imageView   = _pp_back_image.view,
-          .imageLayout = vk::ImageLayout::eGeneral
-      };
-      write_descriptor_sets.push_back(
-          {.dstSet          = _compute_descriptor_set,
-           .dstBinding      = 1,
-           .dstArrayElement = 0,
-           .descriptorCount = 1,
-           .descriptorType  = vk::DescriptorType::eStorageImage,
-           .pImageInfo      = &back_image_descriptor}
-      );
-
-      _device.updateDescriptorSets(write_descriptor_sets, {});
       _vk_context->recreate_swapchain = false;
     } catch (...) {
       handle_exception("swapchain recreation");
@@ -962,9 +932,9 @@ class vulkan_layer final : public Ilayer {
     vk::PipelineDepthStencilStateCreateInfo depth_stencil{
         .depthTestEnable       = vk::True,
         .depthWriteEnable      = vk::True,
-        .depthCompareOp        = vk::CompareOp::eLess,
+        .depthCompareOp        = vk::CompareOp::eGreater,
         .depthBoundsTestEnable = vk::False,
-        .stencilTestEnable     = vk::False
+        .stencilTestEnable     = vk::False,
     };
     vk::PipelineColorBlendStateCreateInfo color_blending{
         .logicOpEnable   = vk::False,
@@ -1063,72 +1033,16 @@ class vulkan_layer final : public Ilayer {
     }
   }
 
-  void create_compute_pipeline() {
-    std::vector<vk::DescriptorSetLayoutBinding> layout_bindings{
-        vk::DescriptorSetLayoutBinding{
-            .binding         = 0,
-            .descriptorType  = vk::DescriptorType::eStorageImage,
-            .descriptorCount = 1,
-            .stageFlags      = vk::ShaderStageFlagBits::eCompute
-        },
-        vk::DescriptorSetLayoutBinding{
-            .binding         = 1,
-            .descriptorType  = vk::DescriptorType::eStorageImage,
-            .descriptorCount = 1,
-            .stageFlags      = vk::ShaderStageFlagBits::eCompute
-        },
-    };
-
-    vk::DescriptorSetLayoutCreateInfo layout_info{
-        .bindingCount = static_cast<uint32_t>(layout_bindings.size()),
-        .pBindings    = layout_bindings.data()
-    };
-
-    _compute_descriptor_set_layout = vk::raii::DescriptorSetLayout(_device, layout_info);
-    if (!*_compute_descriptor_set_layout) {
-      throw std::runtime_error("Descriptor set layout creation silently failed");
-    }
-
-    vk::ShaderModuleCreateInfo shader_module_info{
-        .codeSize = get_app_context()->shader_modules[1].size(),
-        .pCode    = reinterpret_cast<uint32_t*>(get_app_context()->shader_modules[1].data())
-    };
-    _compute_shader_module = vk::raii::ShaderModule(_device, shader_module_info);
-    if (!*_compute_shader_module) {
-      throw std::runtime_error("Shader module creation silently failed");
-    }
-    vk::PipelineShaderStageCreateInfo shader_stage_info{
-        .stage  = vk::ShaderStageFlagBits::eCompute,
-        .module = _compute_shader_module,
-        .pName  = "main"
-    };
-    vk::PushConstantRange range{
-        .stageFlags = vk::ShaderStageFlagBits::eCompute,
-        .offset     = 0,
-        .size       = sizeof(PC_post_processing_data)
-    };
-
-    vk::PipelineLayoutCreateInfo pipeline_layout_info{
-        .setLayoutCount         = 1,
-        .pSetLayouts            = &*_compute_descriptor_set_layout,
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges    = &range
-    };
-
-    _compute_pipeline_layout = vk::raii::PipelineLayout(_device, pipeline_layout_info);
-    if (!*_compute_pipeline_layout) {
-      throw std::runtime_error("Compute pipeline layout creation silently failed");
-    }
-
-    vk::ComputePipelineCreateInfo pipeline_info{
-        .stage = shader_stage_info, .layout = _compute_pipeline_layout
-    };
-    _compute_pipeline = _device.createComputePipeline(nullptr, pipeline_info);
-    if (!*_compute_pipeline) {
-      throw std::runtime_error("Compute pipeline creation failed silently");
-    } else {
-      _console->trace("Created vulkan compute pipeline");
-    }
+  void create_post_processing_shader() {
+    _pp_compute_shader = compute_shader<PC_post_processing_data>(
+        _device,
+        get_app_context()->shader_modules[1],
+        {
+            shader_storage_type::ro_image,
+            shader_storage_type::rw_image,
+            shader_storage_type::rw_image,
+        }
+    );
   }
 
   void create_command_pool() {
@@ -1163,19 +1077,38 @@ class vulkan_layer final : public Ilayer {
       );
     }
 
-    _depth_image = create_image(
+    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
+      _depth_image = create_image(
+          _allocator,
+          _device,
+          _vk_context->config.depth_format,
+          _swapchain_extent.width,
+          _swapchain_extent.height,
+          vk::ImageUsageFlagBits::eDepthStencilAttachment,
+          vk::ImageAspectFlagBits::eDepth,
+          false,
+          1,
+          _vk_context->config.msaa_sample_count
+      );
+      transition_image_global_layout(
+          _depth_image, cmd, layout_transition::undef_to_depth_attachment
+      );
+    }
+    _depth_buffer = create_image(
         _allocator,
         _device,
         _vk_context->config.depth_format,
         _swapchain_extent.width,
         _swapchain_extent.height,
-        vk::ImageUsageFlagBits::eDepthStencilAttachment,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
         vk::ImageAspectFlagBits::eDepth,
         false,
         1,
-        _vk_context->config.msaa_sample_count
+        vk::SampleCountFlagBits::e1
     );
-    transition_image_global_layout(_depth_image, cmd, layout_transition::undef_to_depth_attachment);
+    transition_image_global_layout(
+        _depth_buffer, cmd, layout_transition::undef_to_depth_attachment
+    );
 
     submit_transient_command_buffer(_graphics_queue, std::move(cmd));
   }
@@ -1210,6 +1143,10 @@ class vulkan_layer final : public Ilayer {
     );
     transition_image_global_layout(_pp_back_image, cmd, layout_transition::undef_to_src);
     submit_transient_command_buffer(_graphics_queue, std::move(cmd));
+
+    _pp_compute_shader.update_descriptor_sets(
+        _device, {&_depth_buffer}, {&_pp_front_image, &_pp_back_image}, {}
+    );
   }
 
   void create_descriptor_pools() {
@@ -1256,21 +1193,6 @@ class vulkan_layer final : public Ilayer {
     if (!*_imgui_descriptor_pool) {
       throw std::runtime_error("ImGui's descriptor pool creation silently failed");
     }
-
-    pool_sizes = {
-        vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageImage, .descriptorCount = 2},
-    };
-    pool_info = {
-        .flags         = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-        .maxSets       = 1,
-        .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
-        .pPoolSizes    = pool_sizes.data()
-    };
-
-    _compute_descriptor_pool = vk::raii::DescriptorPool(_device, pool_info);
-    if (!*_compute_descriptor_pool) {
-      throw std::runtime_error("Descriptor pool creation silently failed");
-    }
   }
 
   void create_descriptor_sets() {
@@ -1284,48 +1206,6 @@ class vulkan_layer final : public Ilayer {
     };
 
     _descriptor_sets = _device.allocateDescriptorSets(descriptor_set_info);
-
-    layouts             = {*_compute_descriptor_set_layout};
-    descriptor_set_info = {
-        .descriptorPool     = _compute_descriptor_pool,
-        .descriptorSetCount = 1,
-        .pSetLayouts        = layouts.data()
-    };
-
-    _compute_descriptor_set = std::move(
-        _device.allocateDescriptorSets(descriptor_set_info).front()
-    );
-
-    std::vector<vk::WriteDescriptorSet> write_descriptor_sets;
-    vk::DescriptorImageInfo front_image_descriptor{
-        .sampler     = nullptr,
-        .imageView   = _pp_front_image.view,
-        .imageLayout = vk::ImageLayout::eGeneral
-    };
-    write_descriptor_sets.push_back(
-        {.dstSet          = _compute_descriptor_set,
-         .dstBinding      = 0,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType  = vk::DescriptorType::eStorageImage,
-         .pImageInfo      = &front_image_descriptor}
-    );
-
-    vk::DescriptorImageInfo back_image_descriptor = {
-        .sampler     = nullptr,
-        .imageView   = _pp_back_image.view,
-        .imageLayout = vk::ImageLayout::eGeneral
-    };
-    write_descriptor_sets.push_back(
-        {.dstSet          = _compute_descriptor_set,
-         .dstBinding      = 1,
-         .dstArrayElement = 0,
-         .descriptorCount = 1,
-         .descriptorType  = vk::DescriptorType::eStorageImage,
-         .pImageInfo      = &back_image_descriptor}
-    );
-
-    _device.updateDescriptorSets(write_descriptor_sets, {});
   }
 
   void create_command_buffer() {
@@ -1375,14 +1255,27 @@ class vulkan_layer final : public Ilayer {
           .clearValue  = _vk_context->config.clear_color
       };
     }
-    vk::RenderingAttachmentInfo depth_attachment_info{
-        .imageView   = _depth_image.view,
-        .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-        .loadOp      = vk::AttachmentLoadOp::eClear,
-        .storeOp     = vk::AttachmentStoreOp::eDontCare,
-        .clearValue  = _vk_context->config.clear_depth
-    };
-
+    vk::RenderingAttachmentInfo depth_attachment_info;
+    if (_vk_context->config.msaa_sample_count != vk::SampleCountFlagBits::e1) {
+      depth_attachment_info = {
+          .imageView          = _depth_image.view,
+          .imageLayout        = vk::ImageLayout::eDepthAttachmentOptimal,
+          .resolveMode        = vk::ResolveModeFlagBits::eAverage,
+          .resolveImageView   = _depth_buffer.view,
+          .resolveImageLayout = vk::ImageLayout::eGeneral,
+          .loadOp             = vk::AttachmentLoadOp::eClear,
+          .storeOp            = vk::AttachmentStoreOp::eDontCare,
+          .clearValue         = _vk_context->config.clear_depth
+      };
+    } else {
+      depth_attachment_info = {
+          .imageView   = _depth_buffer.view,
+          .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+          .loadOp      = vk::AttachmentLoadOp::eClear,
+          .storeOp     = vk::AttachmentStoreOp::eStore,
+          .clearValue  = _vk_context->config.clear_depth
+      };
+    }
     vk::RenderingInfo scene_rendering_info{
         .renderArea           = {.offset = {.x = 0, .y = 0}, .extent = _swapchain_extent},
         .layerCount           = 1,
@@ -1440,16 +1333,7 @@ class vulkan_layer final : public Ilayer {
           _pp_back_image, command_buffer, layout_transition::src_to_shader_storage_write
       );
 
-      command_buffer.bindPipeline(vk::PipelineBindPoint::eCompute, _compute_pipeline);
-      command_buffer.bindDescriptorSets(
-          vk::PipelineBindPoint::eCompute,
-          _compute_pipeline_layout,
-          0,
-          {*_compute_descriptor_set},
-          {}
-      );
       auto pp_data = _vk_context->config.post_processing;
-
       PC_post_processing_data push_constants{
           .time               = static_cast<float>(get_app_context()->time),
           .frame              = static_cast<uint32_t>(get_app_context()->frame),
@@ -1459,15 +1343,39 @@ class vulkan_layer final : public Ilayer {
           .exposure           = pp_data.exposure,
           .srgb_transform     = uint32_t(pp_data.srgb_transform),
           .srgb_gamma         = pp_data.srgb_gamma,
-          .srgb_offset        = pp_data.srgb_offset
+          .srgb_offset        = pp_data.srgb_offset,
+          .znear              = get_app_context()->active_camera->get_near_clip(),
+          // .zfar               = get_app_context()->active_camera->get_far_clip(),
+          .enable_fog         = uint32_t(pp_data.enable_fog),
+          .fog_color          = pp_data.fog_color,
+          .fog_falloff        = pp_data.fog_falloff,
       };
 
-      command_buffer.pushConstants<PC_post_processing_data>(
-          _compute_pipeline_layout, vk::ShaderStageFlagBits::eCompute, 0, push_constants
+      transition_image_global_layout(
+          _depth_buffer,
+          command_buffer,
+          vk::ImageLayout::eGeneral,
+          vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+          vk::AccessFlagBits2::eShaderStorageRead,
+          vk::PipelineStageFlagBits2::eEarlyFragmentTests
+              | vk::PipelineStageFlagBits2::eLateFragmentTests,
+          vk::PipelineStageFlagBits2::eComputeShader
       );
 
-      command_buffer.dispatch(
-          (_swapchain_extent.width + 7) / 8, (_swapchain_extent.height + 7) / 8, 1
+      _pp_compute_shader.bind(command_buffer);
+      _pp_compute_shader.dispatch(
+          command_buffer, push_constants, 8, 8, _swapchain_extent.width, _swapchain_extent.height
+      );
+
+      transition_image_global_layout(
+          _depth_buffer,
+          command_buffer,
+          vk::ImageLayout::eDepthAttachmentOptimal,
+          vk::AccessFlagBits2::eShaderStorageRead,
+          vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+          vk::PipelineStageFlagBits2::eComputeShader,
+          vk::PipelineStageFlagBits2::eEarlyFragmentTests
+              | vk::PipelineStageFlagBits2::eLateFragmentTests
       );
 
       transition_image_global_layout(
@@ -1525,7 +1433,6 @@ class vulkan_layer final : public Ilayer {
         .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
         .loadOp      = vk::AttachmentLoadOp::eLoad,
         .storeOp     = vk::AttachmentStoreOp::eStore,
-        .clearValue  = _vk_context->config.clear_color
     };
 
     vk::RenderingInfo ui_rendering_info{
@@ -1653,6 +1560,7 @@ class vulkan_layer final : public Ilayer {
   std::vector<vk::raii::Semaphore> _swapchain_semaphores;
   gpu_image _color_image;  // FOR MSAA
   gpu_image _depth_image;
+  gpu_image _depth_buffer;
   gpu_image _pp_front_image;  // FOR POST PROCESSING
   gpu_image _pp_back_image;
 
@@ -1660,19 +1568,13 @@ class vulkan_layer final : public Ilayer {
   vk::raii::Pipeline _graphics_pipeline     = nullptr;
   vk::raii::PipelineLayout _pipeline_layout = nullptr;
 
-  vk::raii::Pipeline _compute_pipeline              = nullptr;
-  vk::raii::PipelineLayout _compute_pipeline_layout = nullptr;
-
   vk::raii::CommandPool _command_pool = nullptr;
 
-  vk::raii::DescriptorSetLayout _descriptor_set_layout         = nullptr;
-  vk::raii::DescriptorPool _descriptor_pool                    = nullptr;
-  vk::raii::DescriptorSets _descriptor_sets                    = nullptr;
-  vk::raii::DescriptorSetLayout _compute_descriptor_set_layout = nullptr;
-  vk::raii::DescriptorPool _compute_descriptor_pool            = nullptr;
-  vk::raii::DescriptorSet _compute_descriptor_set              = nullptr;
+  vk::raii::DescriptorSetLayout _descriptor_set_layout = nullptr;
+  vk::raii::DescriptorPool _descriptor_pool            = nullptr;
+  vk::raii::DescriptorSets _descriptor_sets            = nullptr;
 
-  vk::raii::ShaderModule _compute_shader_module = nullptr;
+  compute_shader<PC_post_processing_data> _pp_compute_shader = nullptr;
 
   vk::raii::DescriptorPool _imgui_descriptor_pool = nullptr;
 

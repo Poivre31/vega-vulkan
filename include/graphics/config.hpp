@@ -22,7 +22,7 @@ struct dynamic_config {
   bool vsync                     = true;
 
   vk::ClearValue clear_color = vk::ClearColorValue(0.F, 0.F, 0.F, 0.F);
-  vk::ClearValue clear_depth = vk::ClearDepthStencilValue(1.F, 0);
+  vk::ClearValue clear_depth = vk::ClearDepthStencilValue(0.F, 0);
 
   vk::SampleCountFlagBits msaa_sample_count = vk::SampleCountFlagBits::e4;
   std::vector<vk::SampleCountFlagBits> available_msaa_sample_counts;
@@ -39,6 +39,10 @@ struct dynamic_config {
     bool srgb_transform = true;
     float srgb_gamma    = 2.4F;
     float srgb_offset   = 0.055F;
+
+    bool enable_fog     = true;
+    glm::vec3 fog_color = {0.23F, 0.43F, 1.F};
+    float fog_falloff   = 800.F;
   } post_processing;
 };
 

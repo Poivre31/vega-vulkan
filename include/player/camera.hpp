@@ -108,14 +108,23 @@ class Camera {
           "Width or height of a camera is 0, the camera likely hasn't been updated"
       );
     }
-    return glm::perspective(
-        _fov, static_cast<float>(_width) / static_cast<float>(_height), _nearClip, _farClip
+    // return glm::perspective(_fov, , _nearClip, _farClip);
+    float f          = 1.0F / glm::tan(_fov / 2.0F);
+    glm::mat4 result = glm::tweakedInfinitePerspective(
+        _fov, static_cast<float>(_width) / static_cast<float>(_height), _nearClip
     );
+    result[2][2]  = 0.F;
+    result[3][2] *= -0.5F;
+    return result;
   }
 
   [[nodiscard]] glm::mat4x4 get_view_projection_matrix() const {
     return get_projection_matrix() * get_view_matrix();
   }
+
+  // [[nodiscard]] float get_far_clip() const { return _farClip; }
+
+  [[nodiscard]] float get_near_clip() const { return _nearClip; }
 
  private:
   [[nodiscard]] glm::vec3 direction_from_angles() const noexcept {
@@ -155,6 +164,6 @@ class Camera {
   uint32_t _height{};
 
   float _fov{};
-  float _nearClip = 0.01F;
-  float _farClip  = 100.F;
+  float _nearClip = 0.001F;
+  // float _farClip  = 100.F;
 };

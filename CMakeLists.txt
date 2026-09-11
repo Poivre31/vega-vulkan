@@ -77,6 +77,7 @@ target_sources(VegaVulkan PRIVATE
     "vendor/imgui/backends/imgui_impl_sdl3.cpp"
 
     "vendor/imgui/misc/cpp/imgui_stdlib.cpp"
+    include/graphics/compute_shader.hpp
 )
 
 target_include_directories(VegaVulkan PRIVATE "vendor/imgui" "vendor/imgui/backends")

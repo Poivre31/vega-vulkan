@@ -83,7 +83,7 @@ target_include_directories(vendor INTERFACE vma-hpp/VulkanMemoryAllocator/includ
 # GLM
 add_subdirectory(GLM)
 
-target_compile_definitions(vendor INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+target_compile_definitions(vendor INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_ENABLE_EXPERIMENTAL)
 # END GLM
 
 # STB
