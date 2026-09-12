@@ -66,7 +66,12 @@ void imgui_begin_frame() {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplSDL3_NewFrame();
   ImGui::NewFrame();
-  // ImGui::DockSpaceOverViewport();
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0F, 0.0F, 0.0F, 0.0F));
+  ImGui::PushStyleColor(ImGuiCol_DockingEmptyBg, ImVec4(0.0F, 0.0F, 0.0F, 0.0F));
+  ImGui::PushStyleVar(ImGuiStyleVar_DockingSeparatorSize, 0.0F);
+  ImGui::DockSpaceOverViewport();
+  ImGui::PopStyleColor(2);
+  ImGui::PopStyleVar(1);
   ImGui::ShowDemoWindow();
 
   auto& io = ImGui::GetIO();

@@ -25,7 +25,7 @@ struct post_processing_data {
 }
 
 [vk::push_constant]
-ConstantBuffer<post_processing_data> pp;
+ConstantBuffer<post_processing_data, ScalarDataLayout> pp;
 
 const static int N = 16;
 

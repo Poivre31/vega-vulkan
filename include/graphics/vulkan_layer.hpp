@@ -197,6 +197,30 @@ class vulkan_layer final : public Ilayer {
 
     ImGui::End();
 
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0F);
+    ImGui::Begin(
+        "whatever",
+        0,
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoTitleBar
+            | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+            | ImGuiWindowFlags_NoCollapse
+    );
+    ImVec2 vMin  = ImGui::GetWindowContentRegionMin();
+    ImVec2 vMax  = ImGui::GetWindowContentRegionMax();
+    vMin.x      += ImGui::GetWindowPos().x;
+    vMin.y      += ImGui::GetWindowPos().y;
+    vMax.x      += ImGui::GetWindowPos().x;
+    vMax.y      += ImGui::GetWindowPos().y;
+
+    _rect.offset = vk::Offset2D(int(vMin.x), int(vMin.y));
+    _rect.extent = vk::Extent2D(int(vMax.x - vMin.x), int(vMax.y - vMin.y));
+    _rect.offset = vk::Offset2D(0, 0);
+    _rect.extent = _swapchain_extent;
+
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+
     if (_vk_context->recreate_swapchain) {
       recreate_swapchain();
     }
@@ -366,6 +390,11 @@ class vulkan_layer final : public Ilayer {
     if (!features.template get<vk::PhysicalDeviceVulkan12Features>().bufferDeviceAddress) {
       throw std::runtime_error(
           "Selected physical device doesn't support 'buffer device adress', exiting"
+      );
+    }
+    if (!features.template get<vk::PhysicalDeviceVulkan12Features>().scalarBlockLayout) {
+      throw std::runtime_error(
+          "Selected physical device doesn't support 'scalar block layout', exiting"
       );
     }
     if (!features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering) {
@@ -645,6 +674,7 @@ class vulkan_layer final : public Ilayer {
             {
                 .shaderSampledImageArrayNonUniformIndexing = vk::True,
                 .runtimeDescriptorArray                    = vk::True,
+                .scalarBlockLayout                         = vk::True,
                 .bufferDeviceAddress                       = vk::True,
             },
             {
@@ -814,6 +844,7 @@ class vulkan_layer final : public Ilayer {
       _pp_front_image.view  = nullptr;
       _pp_back_image.image  = nullptr;
       _pp_back_image.view   = nullptr;
+
       create_swapchain();
       create_depth_resources();
       create_post_processing_resources();
@@ -1168,23 +1199,23 @@ class vulkan_layer final : public Ilayer {
     }
 
     pool_sizes = {
-        {.type = vk::DescriptorType::eSampler, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eSampledImage, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eStorageImage, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eUniformTexelBuffer, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eStorageTexelBuffer, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eStorageBufferDynamic, .descriptorCount = 1000},
-        {.type = vk::DescriptorType::eInputAttachment, .descriptorCount = 1000},
+        {.type = vk::DescriptorType::eSampler, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eSampledImage, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eStorageImage, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eUniformTexelBuffer, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eStorageTexelBuffer, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eStorageBufferDynamic, .descriptorCount = 50},
+        {.type = vk::DescriptorType::eInputAttachment, .descriptorCount = 50},
     };
 
     pool_info = {
         .flags         = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet
                          | vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
-        .maxSets       = 1000,
+        .maxSets       = 50,
         .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
         .pPoolSizes    = pool_sizes.data()
     };
@@ -1299,7 +1330,7 @@ class vulkan_layer final : public Ilayer {
             .maxDepth = 1.0F
         }
     );
-    command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapchain_extent));
+    command_buffer.setScissor(0, _rect);
 
     command_buffer.bindDescriptorSets(
         vk::PipelineBindPoint::eGraphics,
@@ -1582,4 +1613,6 @@ class vulkan_layer final : public Ilayer {
   uint32_t _frame_index = 0;
   std::vector<vk::raii::Semaphore> _presentation_semaphores;
   std::vector<vk::raii::Fence> _draw_fences;
+
+  vk::Rect2D _rect{};
 };

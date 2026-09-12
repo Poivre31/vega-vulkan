@@ -21,11 +21,12 @@ class ui_layer final : public Ilayer {
  public:
   using Ilayer::Ilayer;
   void gui_update() noexcept final {
-    ImGui::Begin("Debug");
-    if (ImGui::Button("Press me")) {
-      console::get(consoles::engine)->info("Hello!");
-    }
-    ImGui::End();
+    // ImGui::Begin("About");
+    // ImGui::Text("I have to say smth ? Hm idk what to say");
+    // if (ImGui::Button("Press me")) {
+    //   console::get(consoles::engine)->info("Hello!");
+    // }
+    // ImGui::End();
   }
 };
 
